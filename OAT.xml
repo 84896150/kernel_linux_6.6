@@ -442,6 +442,15 @@
 				<filteritem type="filepath" name="tools/perf/tests/pe-file.exe.debug" desc="shield"/>
 				<filteritem type="filepath" name="arch/m68k/ifpsp060/ilsp.doc" desc="shield"/>
 				<filteritem type="filepath" name="arch/m68k/ifpsp060/isp.doc" desc="shield"/>
+				<filteritem type="filepath" name="drivers/net/wireless/ath/ath12k/pci.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/net/wireless/ath/ath12k/hw.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/net/wireless/ath/ath12k/mac.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/net/wireless/ath/ath12k/peer.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/net/wireless/ath/ath12k/hal.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/net/wireless/ath/ath12k/hif.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/net/wireless/ath/ath12k/rx_desc.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/net/wireless/ath/ath12k/qmi.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/net/wireless/ath/ath12k/reg.h" desc="shield"/>
             </filefilter>
         </filefilterlist>
     </oatconfig>
