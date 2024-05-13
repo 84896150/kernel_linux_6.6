@@ -219,7 +219,7 @@ int hmdfs_persist_perm(struct dentry *dentry, __u16 *perm)
 		return -EINVAL;
 
 	inode_lock(minode);
-	err = __vfs_setxattr(dentry, minode, HMDFS_PERM_XATTR, perm,
+	err = __vfs_setxattr(&nop_mnt_idmap, dentry, minode, HMDFS_PERM_XATTR, perm,
 			     sizeof(*perm), XATTR_CREATE);
 	if (!err)
 		fsnotify_xattr(dentry);

@@ -117,7 +117,7 @@ static void hmdfs_file_modified(struct file *file)
 	struct inode *lower_inode = file_inode(lower_file);
 
 	inode->i_atime = lower_inode->i_atime;
-	inode->i_ctime = lower_inode->i_ctime;
+	inode->__i_ctime = lower_inode->__i_ctime;
 	inode->i_mtime = lower_inode->i_mtime;
 	i_size_write(inode, i_size_read(lower_inode));
 
@@ -224,7 +224,7 @@ const struct file_operations hmdfs_file_fops_local = {
 	.open = hmdfs_file_open_local,
 	.release = hmdfs_file_release_local,
 	.fsync = hmdfs_fsync_local,
-	.splice_read = generic_file_splice_read,
+	.splice_read = copy_splice_read,
 	.splice_write = iter_file_splice_write,
 };
 
@@ -295,7 +295,7 @@ static int hmdfs_dir_release_local(struct inode *inode, struct file *file)
 
 const struct file_operations hmdfs_dir_ops_local = {
 	.owner = THIS_MODULE,
-	.iterate = hmdfs_iterate_local,
+	.iterate_shared = hmdfs_iterate_local,
 	.open = hmdfs_dir_open_local,
 	.release = hmdfs_dir_release_local,
 	.fsync = hmdfs_fsync_local,
@@ -396,7 +396,7 @@ static long hmdfs_dir_ioctl_local(struct file *file, unsigned int cmd,
 
 const struct file_operations hmdfs_dir_ops_share = {
 	.owner = THIS_MODULE,
-	.iterate = hmdfs_iterate_local,
+	.iterate_shared = hmdfs_iterate_local,
 	.open = hmdfs_dir_open_local,
 	.release = hmdfs_dir_release_local,
 	.fsync = hmdfs_fsync_local,

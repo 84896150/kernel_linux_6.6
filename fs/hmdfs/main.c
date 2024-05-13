@@ -71,7 +71,7 @@ static int hmdfs_xattr_local_get(struct dentry *dentry, const char *name,
 	ssize_t res = 0;
 
 	hmdfs_get_lower_path(dentry, &lower_path);
-	res = vfs_getxattr(lower_path.dentry, name, value, size);
+	res = vfs_getxattr(&nop_mnt_idmap, lower_path.dentry, name, value, size);
 	hmdfs_put_lower_path(&lower_path);
 	return res;
 }
@@ -155,10 +155,10 @@ static int hmdfs_xattr_local_set(struct dentry *dentry, const char *name,
 	hmdfs_get_lower_path(dentry, &lower_path);
 	kuid_t tmp_uid = hmdfs_override_inode_uid(d_inode(lower_path.dentry));
 	if (value) {
-		res = vfs_setxattr(lower_path.dentry, name, value, size, flags);
+		res = vfs_setxattr(&nop_mnt_idmap, lower_path.dentry, name, value, size, flags);
 	} else {
 		WARN_ON(flags != XATTR_REPLACE);
-		res = vfs_removexattr(lower_path.dentry, name);
+		res = vfs_removexattr(&nop_mnt_idmap, lower_path.dentry, name);
 	}
 	hmdfs_revert_inode_uid(d_inode(lower_path.dentry), tmp_uid);
 
@@ -200,7 +200,7 @@ out:
 	return err;
 }
 
-static int hmdfs_xattr_set(const struct xattr_handler *handler,
+static int hmdfs_xattr_set(const struct xattr_handler *handler, struct mnt_idmap *idmap, 
 			   struct dentry *dentry, struct inode *inode,
 			   const char *name, const void *value,
 			   size_t size, int flags)
@@ -842,9 +842,10 @@ uint64_t hmdfs_gen_boot_cookie(void)
 {
 	uint64_t now;
 	uint16_t rand;
+    struct rnd_state rnd_state;
 
 	now = ktime_to_ms(ktime_get());
-	prandom_bytes(&rand, sizeof(rand));
+	prandom_bytes_state(&rnd_state, (void *)&rand, 2);
 
 	now &= (1ULL << HMDFS_BOOT_COOKIE_RAND_SHIFT) - 1;
 	now |= ((uint64_t)rand << HMDFS_BOOT_COOKIE_RAND_SHIFT);

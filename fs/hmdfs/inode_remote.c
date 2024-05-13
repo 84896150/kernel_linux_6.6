@@ -354,8 +354,8 @@ struct inode *fill_inode_remote(struct super_block *sb, struct hmdfs_peer *con,
 
 	hmdfs_remote_init_stash_status(con, inode, mode);
 
-	inode->i_ctime.tv_sec = 0;
-	inode->i_ctime.tv_nsec = 0;
+	inode->__i_ctime.tv_sec = 0;
+	inode->__i_ctime.tv_nsec = 0;
 	inode->i_mtime.tv_sec = res->i_mtime;
 	inode->i_mtime.tv_nsec = res->i_mtime_nsec;
 
@@ -571,7 +571,7 @@ mkdir_out:
 	return err;
 }
 
-int hmdfs_mkdir_remote(struct inode *dir, struct dentry *dentry, umode_t mode)
+int hmdfs_mkdir_remote(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	int err = 0;
 	struct hmdfs_inode_info *info = hmdfs_i(dir);
@@ -641,7 +641,7 @@ create_out:
 	return err;
 }
 
-int hmdfs_create_remote(struct inode *dir, struct dentry *dentry, umode_t mode,
+int hmdfs_create_remote(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode,
 			bool want_excl)
 {
 	int err = 0;
@@ -776,7 +776,7 @@ static void rename_in_cache_file(uint64_t dev_id, struct dentry *old_dentry,
 		kref_put(&new_item->ref, release_cache_item);
 }
 
-int hmdfs_rename_remote(struct inode *old_dir, struct dentry *old_dentry,
+int hmdfs_rename_remote(struct mnt_idmap *idmap, struct inode *old_dir, struct dentry *old_dentry,
 			struct inode *new_dir, struct dentry *new_dentry,
 			unsigned int flags)
 {
@@ -827,7 +827,7 @@ int hmdfs_rename_remote(struct inode *old_dir, struct dentry *old_dentry,
 			rename_in_cache_file(con->device_id, old_dentry,
 						new_dentry);
 	} else if (S_ISDIR(old_dentry->d_inode->i_mode)) {
-		if ((con->status == NODE_STAT_ONLINE)) {
+		if (con->status == NODE_STAT_ONLINE) {
 			ret = hmdfs_client_start_rename(
 				con, relative_old_dir_path, old_dentry_d_name,
 				relative_new_dir_path, new_dentry_d_name,
@@ -847,7 +847,7 @@ rename_out:
 	return err;
 }
 
-static int hmdfs_dir_setattr_remote(struct dentry *dentry, struct iattr *ia)
+static int hmdfs_dir_setattr_remote(struct mnt_idmap *idmap, struct dentry *dentry, struct iattr *ia)
 {
 	// Do not support dir setattr
 	return 0;
@@ -864,7 +864,7 @@ const struct inode_operations hmdfs_dev_dir_inode_ops_remote = {
 	.permission = hmdfs_permission,
 };
 
-static int hmdfs_setattr_remote(struct dentry *dentry, struct iattr *ia)
+static int hmdfs_setattr_remote(struct mnt_idmap *idmap, struct dentry *dentry, struct iattr *ia)
 {
 	struct hmdfs_inode_info *info = hmdfs_i(d_inode(dentry));
 	struct hmdfs_peer *conn = info->conn;
@@ -937,7 +937,7 @@ int hmdfs_remote_getattr(struct hmdfs_peer *conn, struct dentry *dentry,
 	return 0;
 }
 
-static int hmdfs_get_cached_attr_remote(const struct path *path,
+static int hmdfs_get_cached_attr_remote(struct mnt_idmap *idmap, const struct path *path,
 					struct kstat *stat, u32 request_mask,
 					unsigned int flags)
 {

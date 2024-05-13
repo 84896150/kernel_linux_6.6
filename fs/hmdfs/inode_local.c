@@ -116,7 +116,7 @@ struct inode *fill_inode_local(struct super_block *sb,
 	inode->i_gid = KGIDT_INIT((gid_t)1000);
 #endif
 	inode->i_atime = lower_inode->i_atime;
-	inode->i_ctime = lower_inode->i_ctime;
+	inode->__i_ctime = lower_inode->__i_ctime;
 	inode->i_mtime = lower_inode->i_mtime;
 	inode->i_generation = lower_inode->i_generation;
 
@@ -171,7 +171,7 @@ int hmdfs_convert_lookup_flags(unsigned int hmdfs_flags,
 	return 0;
 }
 
-static int hmdfs_name_match(struct dir_context *ctx, const char *name,
+static bool hmdfs_name_match(struct dir_context *ctx, const char *name,
 			    int namelen, loff_t offset, u64 ino,
 			    unsigned int d_type)
 {
@@ -348,7 +348,7 @@ int hmdfs_mkdir_local_dentry(struct inode *dir, struct dentry *dentry,
 	tmp_uid = hmdfs_override_inode_uid(lower_dir);
 	mode = (mode & S_IFMT) | 00771;
 
-	error = vfs_mkdir(lower_dir, lower_dentry, mode);
+	error = vfs_mkdir(&nop_mnt_idmap, lower_dir, lower_dentry, mode);
 	hmdfs_revert_inode_uid(lower_dir, tmp_uid);
 	if (error) {
 		hmdfs_err("vfs_mkdir() error:%d", error);
@@ -381,7 +381,7 @@ cleanup:
 	return error;
 }
 
-int hmdfs_mkdir_local(struct inode *dir, struct dentry *dentry, umode_t mode)
+int hmdfs_mkdir_local(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	int err = 0;
 
@@ -437,7 +437,7 @@ int hmdfs_create_local_dentry(struct inode *dir, struct dentry *dentry,
 	lower_dir_dentry = lock_parent(lower_dentry);
 	lower_dir = d_inode(lower_dir_dentry);
 	tmp_uid = hmdfs_override_inode_uid(lower_dir);
-	error = vfs_create(lower_dir, lower_dentry, mode, want_excl);
+	error = vfs_create(&nop_mnt_idmap, lower_dir, lower_dentry, mode, want_excl);
 	hmdfs_revert_inode_uid(lower_dir, tmp_uid);
 	unlock_dir(lower_dir_dentry);
 	if (error)
@@ -474,7 +474,7 @@ path_err:
 	return error;
 }
 
-int hmdfs_create_local(struct inode *dir, struct dentry *child_dentry,
+int hmdfs_create_local(struct mnt_idmap *idmap, struct inode *dir, struct dentry *child_dentry,
 		       umode_t mode, bool want_excl)
 {
 	int err = 0;
@@ -520,7 +520,7 @@ int hmdfs_rmdir_local_dentry(struct inode *dir, struct dentry *dentry)
 	}
 	tmp_uid = hmdfs_override_inode_uid(lower_dir);
 
-	error = vfs_rmdir(lower_dir, lookup_dentry);
+	error = vfs_rmdir(&nop_mnt_idmap, lower_dir, lookup_dentry);
 	hmdfs_revert_inode_uid(lower_dir, tmp_uid);
 	dput(lookup_dentry);
 lookup_err:
@@ -585,7 +585,7 @@ int hmdfs_unlink_local_dentry(struct inode *dir, struct dentry *dentry)
 	}
 
 	tmp_uid = hmdfs_override_inode_uid(lower_dir);
-	error = vfs_unlink(lower_dir, lookup_dentry, NULL);
+	error = vfs_unlink(&nop_mnt_idmap, lower_dir, lookup_dentry, NULL);
 	hmdfs_revert_inode_uid(lower_dir, tmp_uid);
 	set_nlink(d_inode(dentry),
 		  hmdfs_i(d_inode(dentry))->lower_inode->i_nlink);
@@ -625,6 +625,7 @@ int hmdfs_rename_local_dentry(struct inode *old_dir, struct dentry *old_dentry,
 	struct dentry *lower_old_dir_dentry = NULL;
 	struct dentry *lower_new_dir_dentry = NULL;
 	struct dentry *trap = NULL;
+	struct renamedata rename_data;
 	int rc = 0;
 	kuid_t old_dir_uid, new_dir_uid;
 
@@ -664,9 +665,15 @@ int hmdfs_rename_local_dentry(struct inode *old_dir, struct dentry *old_dentry,
 		goto out_lock;
 	}
 
-	rc = vfs_rename(d_inode(lower_old_dir_dentry), lower_old_dentry,
-			d_inode(lower_new_dir_dentry), lower_new_dentry, NULL,
-			flags);
+	rename_data.old_mnt_idmap = &nop_mnt_idmap;
+	rename_data.old_dir = d_inode(lower_old_dir_dentry);
+	rename_data.old_dentry = lower_old_dentry;
+	rename_data.new_mnt_idmap = &nop_mnt_idmap;
+	rename_data.new_dir = d_inode(lower_new_dir_dentry);
+	rename_data.new_dentry = lower_new_dentry;
+	rename_data.flags = flags;
+	rc = vfs_rename(&rename_data);
+
 out_lock:
 	dget(old_dentry);
 
@@ -696,7 +703,7 @@ out_put_old_path:
 	return rc;
 }
 
-int hmdfs_rename_local(struct inode *old_dir, struct dentry *old_dentry,
+int hmdfs_rename_local(struct mnt_idmap *idmap, struct inode *old_dir, struct dentry *old_dentry,
 		       struct inode *new_dir, struct dentry *new_dentry,
 		       unsigned int flags)
 {
@@ -763,7 +770,7 @@ static bool symname_is_allowed(const char *symname)
 	return true;
 }
 
-int hmdfs_symlink_local(struct inode *dir, struct dentry *dentry,
+int hmdfs_symlink_local(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry,
 			const char *symname)
 {
 	int err;
@@ -803,7 +810,7 @@ int hmdfs_symlink_local(struct inode *dir, struct dentry *dentry,
 	lower_dentry = lower_path.dentry;
 	lower_parent_dentry = lock_parent(lower_dentry);
 	tmp_uid = hmdfs_override_inode_uid(lower_dir_inode);
-	err = vfs_symlink(lower_dir_inode, lower_dentry, symname);
+	err = vfs_symlink(&nop_mnt_idmap, lower_dir_inode, lower_dentry, symname);
 	hmdfs_revert_inode_uid(lower_dir_inode, tmp_uid);
 	unlock_dir(lower_parent_dentry);
 	if (err)
@@ -867,7 +874,7 @@ link_out:
 	return link;
 }
 
-static int hmdfs_setattr_local(struct dentry *dentry, struct iattr *ia)
+static int hmdfs_setattr_local(struct mnt_idmap *idmap, struct dentry *dentry, struct iattr *ia)
 {
 	struct inode *inode = d_inode(dentry);
 	struct inode *lower_inode = hmdfs_i(inode)->lower_inode;
@@ -893,11 +900,11 @@ static int hmdfs_setattr_local(struct dentry *dentry, struct iattr *ia)
 	inode_lock(lower_inode);
 	tmp_uid = hmdfs_override_inode_uid(lower_inode);
 
-	err = notify_change(lower_dentry, &lower_ia, NULL);
+	err = notify_change(&nop_mnt_idmap, lower_dentry, &lower_ia, NULL);
 	i_size_write(inode, i_size_read(lower_inode));
 	inode->i_atime = lower_inode->i_atime;
 	inode->i_mtime = lower_inode->i_mtime;
-	inode->i_ctime = lower_inode->i_ctime;
+	inode->__i_ctime = lower_inode->__i_ctime;
 	err = update_inode_to_dentry(dentry, inode);
 	hmdfs_revert_inode_uid(lower_inode, tmp_uid);
 
@@ -907,7 +914,7 @@ out:
 	return err;
 }
 
-static int hmdfs_getattr_local(const struct path *path, struct kstat *stat,
+static int hmdfs_getattr_local(struct mnt_idmap *idmap, const struct path *path, struct kstat *stat,
 			       u32 request_mask, unsigned int flags)
 {
 	struct path lower_path;
@@ -925,7 +932,7 @@ static int hmdfs_getattr_local(const struct path *path, struct kstat *stat,
 	return ret;
 }
 
-int hmdfs_permission(struct inode *inode, int mask)
+int hmdfs_permission(struct mnt_idmap *idmap, struct inode *inode, int mask)
 {
 #ifdef CONFIG_HMDFS_FS_PERMISSION
 	unsigned int mode = inode->i_mode;

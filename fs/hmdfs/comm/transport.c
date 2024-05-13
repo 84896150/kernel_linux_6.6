@@ -265,9 +265,9 @@ out:
 	return ret;
 }
 
-static void aeadcipher_cb(struct crypto_async_request *req, int error)
+static void aeadcipher_cb(void *req, int error)
 {
-	struct aeadcrypt_result *result = req->data;
+	struct aeadcrypt_result *result = ((struct crypto_async_request *)req)->data;
 
 	if (error == -EINPROGRESS)
 		return;

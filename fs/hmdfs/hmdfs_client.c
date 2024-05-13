@@ -206,7 +206,6 @@ static void hmdfs_client_writepage_err(struct hmdfs_peer *peer,
 		mapping_set_error(page->mapping, -EIO);
 	} else {
 		__set_page_dirty_nobuffers(page);
-		account_page_redirty(page);
 	}
 
 	end_page_writeback(page);

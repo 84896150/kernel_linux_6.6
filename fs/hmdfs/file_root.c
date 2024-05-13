@@ -165,10 +165,10 @@ int hmdfs_root_iterate(struct file *file, struct dir_context *ctx)
 
 const struct file_operations hmdfs_root_fops = {
 	.owner = THIS_MODULE,
-	.iterate = hmdfs_root_iterate,
+	.iterate_shared = hmdfs_root_iterate,
 };
 
 const struct file_operations hmdfs_device_fops = {
 	.owner = THIS_MODULE,
-	.iterate = hmdfs_device_iterate,
+	.iterate_shared = hmdfs_device_iterate,
 };

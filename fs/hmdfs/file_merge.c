@@ -206,8 +206,8 @@ static void rename_conflicting_directory(char *dentry_name, int *len)
 	*len += strlen(CONFLICTING_DIR_SUFFIX);
 }
 
-static int hmdfs_actor_merge(struct dir_context *ctx, const char *name,
-			     int namelen, loff_t offset, u64 ino,
+static bool hmdfs_actor_merge(struct dir_context *ctx, const char *name,
+			     int namelen, long long offset, unsigned long long ino,
 			     unsigned int d_type)
 {
 	int ret = 0;
@@ -520,7 +520,7 @@ long hmdfs_dir_compat_ioctl_merge(struct file *file, unsigned int cmd,
 
 const struct file_operations hmdfs_dir_fops_merge = {
 	.owner = THIS_MODULE,
-	.iterate = hmdfs_iterate_merge,
+	.iterate_shared = hmdfs_iterate_merge,
 	.open = hmdfs_dir_open_merge,
 	.release = hmdfs_dir_release_merge,
 	.unlocked_ioctl = hmdfs_dir_unlocked_ioctl_merge,
@@ -604,7 +604,7 @@ static int copy_string_from_user(unsigned long pos, unsigned long len,
 
 	if (len >= PATH_MAX)
 		return -EINVAL;
-	if (!access_ok(pos, len))
+	if (!access_ok((char __user *)pos, len))
 		return -EFAULT;
 
 	tmp_data = kzalloc(len + 1, GFP_KERNEL);
@@ -707,7 +707,7 @@ static int create_link_file(struct hmdfs_user_info *data)
 	dentry = kern_path_create(AT_FDCWD, data->distributed_path, &path, 0);
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
-	ret = vfs_symlink(path.dentry->d_inode, dentry, data->local_path);
+	ret = vfs_symlink(&nop_mnt_idmap, path.dentry->d_inode, dentry, data->local_path);
 	done_path_create(&path, dentry);
 
 	return ret;
@@ -725,7 +725,7 @@ static int create_dir(const char *path_value, mode_t mode)
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
 
-	err = vfs_mkdir(d_inode(path.dentry), dentry, mode);
+	err = vfs_mkdir(&nop_mnt_idmap, d_inode(path.dentry), dentry, mode);
 	if (err && err != -EEXIST)
 		hmdfs_err("vfs_mkdir failed, err = %d", err);
 	done_path_create(&path, dentry);
@@ -831,6 +831,6 @@ const struct file_operations hmdfs_file_fops_merge = {
 	.fsync = hmdfs_fsync_local,
 	.unlocked_ioctl	= hmdfs_file_ioctl_merge,
 	.compat_ioctl = hmdfs_file_ioctl_merge,
-	.splice_read = generic_file_splice_read,
+	.splice_read = copy_splice_read,
 	.splice_write = iter_file_splice_write,
 };

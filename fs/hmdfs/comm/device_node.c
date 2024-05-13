@@ -1237,6 +1237,7 @@ static struct attribute *sbi_attrs[] = {
 	&sbi_features_attr.attr,
 	NULL,
 };
+ATTRIBUTE_GROUPS(sbi);
 
 static ssize_t sbi_attr_show(struct kobject *kobj, struct attribute *attr,
 			     char *buf)
@@ -1272,7 +1273,7 @@ static void sbi_release(struct kobject *kobj)
 
 static struct kobj_type sbi_ktype = {
 	.sysfs_ops = &sbi_sysfs_ops,
-	.default_attrs = sbi_attrs,
+	.default_groups = sbi_groups,
 	.release = sbi_release,
 };
 
@@ -1353,6 +1354,7 @@ static struct attribute *sbi_timeout_attrs[] = {
 	ATTR_LIST(setxattr), ATTR_LIST(listxattr),
 	NULL
 };
+ATTRIBUTE_GROUPS(sbi_timeout);
 
 static const struct sysfs_ops sbi_cmd_sysfs_ops = {
 	.show = cmd_timeout_show,
@@ -1369,7 +1371,7 @@ static void sbi_timeout_release(struct kobject *kobj)
 
 static struct kobj_type sbi_timeout_ktype = {
 	.sysfs_ops = &sbi_cmd_sysfs_ops,
-	.default_attrs = sbi_timeout_attrs,
+	.default_groups = sbi_timeout_groups,
 	.release = sbi_timeout_release,
 };
 
@@ -1555,6 +1557,7 @@ static struct attribute *peer_attrs[] = {
 	&peer_rebuild_attr.attr,
 	NULL,
 };
+ATTRIBUTE_GROUPS(peer);
 
 static ssize_t peer_attr_show(struct kobject *kobj, struct attribute *attr,
 			      char *buf)
@@ -1590,7 +1593,7 @@ static void peer_sysfs_release(struct kobject *kobj)
 
 static struct kobj_type peer_ktype = {
 	.sysfs_ops = &peer_sysfs_ops,
-	.default_attrs = peer_attrs,
+	.default_groups = peer_groups,
 	.release = peer_sysfs_release,
 };
 

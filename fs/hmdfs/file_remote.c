@@ -134,7 +134,7 @@ out:
 		return ret;
 
 	if (reason == SIZE_OR_CTIME_DISMATCH) {
-		inode->i_ctime = open_ret->remote_ctime;
+		inode->__i_ctime = open_ret->remote_ctime;
 		info->remote_ctime = open_ret->remote_ctime;
 	}
 
@@ -412,7 +412,7 @@ static void hmdfs_remote_keep_writecache(struct inode *inode, struct file *file)
 	 * update ctime from remote, in case that pagecahe will be
 	 * truncated in next open.
 	 */
-	inode->i_ctime = getattr_ret->stat.ctime;
+	inode->__i_ctime = getattr_ret->stat.ctime;
 	info->remote_ctime = getattr_ret->stat.ctime;
 	hmdfs_set_writecache_expire(info, write_cache_timeout);
 	kfree(getattr_ret);
@@ -624,7 +624,7 @@ const struct file_operations hmdfs_dev_file_fops_remote = {
 	.release = hmdfs_file_release_remote,
 	.flush = hmdfs_file_flush,
 	.fsync = hmdfs_file_fsync_remote,
-	.splice_read = generic_file_splice_read,
+	.splice_read = copy_splice_read,
 	.splice_write = iter_file_splice_write,
 };
 
@@ -659,6 +659,12 @@ static int hmdfs_readpage_remote(struct file *file, struct page *page)
 
 	hmdfs_remote_fetch_fid(info, &fid);
 	return hmdfs_client_readpage(info->conn, &fid, page);
+}
+
+static int hmdfs_read_folio(struct file *file, struct folio *folio)
+{
+	struct page *page = &folio->page;
+	return hmdfs_readpage_remote(file, page);
 }
 
 uint32_t hmdfs_get_writecount(struct page *page)
@@ -784,7 +790,7 @@ static void hmdfs_account_dirty_pages(struct address_space *mapping)
 
 static int hmdfs_write_begin_remote(struct file *file,
 				    struct address_space *mapping, loff_t pos,
-				    unsigned int len, unsigned int flags,
+				    unsigned int len,
 				    struct page **pagep, void **fsdata)
 {
 	pgoff_t index = ((unsigned long long)pos) >> PAGE_SHIFT;
@@ -793,7 +799,7 @@ static int hmdfs_write_begin_remote(struct file *file,
 	int ret = 0;
 
 start:
-	page = grab_cache_page_write_begin(mapping, index, AOP_FLAG_NOFS);
+	page = grab_cache_page_write_begin(mapping, index);
 	if (!page)
 		return -ENOMEM;
 	*pagep = page;
@@ -818,7 +824,7 @@ start:
 	ret = hmdfs_readpage_remote(file, page);
 	if (!ret) {
 		if (PageLocked(page)) {
-			ret = __lock_page_killable(page);
+			ret = folio_lock_killable(page_folio(page));
 			if (!ret)
 				unlock_page(page);
 		}
@@ -869,11 +875,11 @@ unlock_out:
 }
 
 const struct address_space_operations hmdfs_dev_file_aops_remote = {
-	.readpage = hmdfs_readpage_remote,
+	.read_folio = hmdfs_read_folio,
 	.write_begin = hmdfs_write_begin_remote,
 	.write_end = hmdfs_write_end_remote,
 	.writepage = hmdfs_writepage_remote,
-	.set_page_dirty = __set_page_dirty_nobuffers,
+	.dirty_folio = filemap_dirty_folio,
 };
 
 loff_t hmdfs_set_pos(unsigned long dev_id, unsigned long group_id,
@@ -1050,7 +1056,7 @@ static int hmdfs_dir_release_remote(struct inode *inode, struct file *file)
 
 const struct file_operations hmdfs_dev_dir_ops_remote = {
 	.owner = THIS_MODULE,
-	.iterate = hmdfs_iterate_remote,
+	.iterate_shared = hmdfs_iterate_remote,
 	.open = hmdfs_dir_open_remote,
 	.release = hmdfs_dir_release_remote,
 	.fsync = __generic_file_fsync,

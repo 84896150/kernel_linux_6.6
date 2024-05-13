@@ -174,7 +174,7 @@ static struct dentry *hmdfs_do_vfs_mkdir(struct dentry *parent,
 		goto out;
 	}
 
-	err = vfs_mkdir(dir, child, mode);
+	err = vfs_mkdir(&nop_mnt_idmap, dir, child, mode);
 	if (err) {
 		dput(child);
 		child = ERR_PTR(err);
@@ -206,7 +206,6 @@ struct dentry *hmdfs_stash_new_work_dir(struct dentry *parent)
 static struct file *hmdfs_new_stash_file(struct path *d_path, const char *cid)
 {
 	struct dentry *parent = NULL;
-	struct dentry *child = NULL;
 	struct file *filp = NULL;
 	struct path stash;
 	int err;
@@ -218,30 +217,21 @@ static struct file *hmdfs_new_stash_file(struct path *d_path, const char *cid)
 		goto mkdir_err;
 	}
 
-	child = vfs_tmpfile(parent, S_IFREG | 0600, 0);
-	if (IS_ERR(child)) {
-		err = PTR_ERR(child);
-		hmdfs_err("new stash file error %d", err);
-		goto tmpfile_err;
-	}
-
 	stash.mnt = d_path->mnt;
-	stash.dentry = child;
-	filp = dentry_open(&stash, O_LARGEFILE | O_WRONLY, current_cred());
+	stash.dentry = parent;
+	filp = kernel_tmpfile_open(&nop_mnt_idmap, &stash, S_IFREG | 0600,
+	                         O_LARGEFILE | O_WRONLY, current_cred());
 	if (IS_ERR(filp)) {
 		err = PTR_ERR(filp);
 		hmdfs_err("open stash file error %d", err);
 		goto open_err;
 	}
 
-	dput(child);
 	dput(parent);
 
 	return filp;
 
 open_err:
-	dput(child);
-tmpfile_err:
 	dput(parent);
 mkdir_err:
 	return ERR_PTR(err);
@@ -490,7 +480,7 @@ lookup_again:
 		hmdfs_warning("%s exists (mode 0%o)",
 			      name, d_inode(child)->i_mode);
 
-		err = vfs_unlink(dir, child, NULL);
+		err = vfs_unlink(&nop_mnt_idmap, dir, child, NULL);
 		if (err) {
 			hmdfs_err("unlink %s err %d", name, err);
 			goto out;
@@ -505,7 +495,7 @@ lookup_again:
 		goto lookup_again;
 	}
 
-	err = vfs_link(stash, dir, child, NULL);
+	err = vfs_link(stash, &nop_mnt_idmap, dir, child, NULL);
 	if (err) {
 		hmdfs_err("link stash file to %s err %d", name, err);
 		goto out;
@@ -1020,7 +1010,7 @@ static int hmdfs_parse_stash_file_name(struct dir_context *dctx,
 	return 1;
 }
 
-static int hmdfs_has_stash_file(struct dir_context *dctx, const char *name,
+static bool hmdfs_has_stash_file(struct dir_context *dctx, const char *name,
 				int namelen, loff_t offset,
 				u64 inum, unsigned int d_type)
 {
@@ -1038,7 +1028,7 @@ static int hmdfs_has_stash_file(struct dir_context *dctx, const char *name,
 	return 1;
 }
 
-static int hmdfs_fill_stash_file(struct dir_context *dctx, const char *name,
+static bool hmdfs_fill_stash_file(struct dir_context *dctx, const char *name,
 				 int namelen, loff_t offset,
 				 u64 inum, unsigned int d_type)
 {
@@ -1068,7 +1058,7 @@ static int hmdfs_del_stash_file(struct dentry *parent, struct dentry *child)
 	dget(child);
 
 	inode_lock_nested(dir, I_MUTEX_PARENT);
-	err = vfs_unlink(dir, child, NULL);
+	err = vfs_unlink(&nop_mnt_idmap, dir, child, NULL);
 	if (err)
 		hmdfs_err("remove stash file err %d", err);
 	inode_unlock(dir);
@@ -1318,7 +1308,6 @@ static void hmdfs_init_copy_args(const struct hmdfs_file_restore_ctx *ctx,
 static ssize_t hmdfs_write_dst(struct hmdfs_peer *conn, struct file *filp,
 			       void *buf, size_t len, loff_t pos)
 {
-	mm_segment_t old_fs;
 	struct kiocb kiocb;
 	struct iovec iov;
 	struct iov_iter iter;
@@ -1326,8 +1315,6 @@ static ssize_t hmdfs_write_dst(struct hmdfs_peer *conn, struct file *filp,
 	int err = 0;
 
 	file_start_write(filp);
-
-	old_fs = force_uaccess_begin();
 
 	init_sync_kiocb(&kiocb, filp);
 	kiocb.ki_pos = pos;
@@ -1337,8 +1324,6 @@ static ssize_t hmdfs_write_dst(struct hmdfs_peer *conn, struct file *filp,
 	iov_iter_init(&iter, WRITE, &iov, 1, len);
 
 	wr = hmdfs_file_write_iter_remote_nocheck(&kiocb, &iter);
-
-	force_uaccess_end(old_fs);
 
 	file_end_write(filp);
 

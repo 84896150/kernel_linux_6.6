@@ -323,7 +323,7 @@ static int check_sec_level(struct hmdfs_peer *node, const char *file_name)
 		goto out_err;
 	}
 
-	err = vfs_getxattr(file_path.dentry, DATA_SEC_LEVEL_LABEL, value,
+	err = vfs_getxattr(&nop_mnt_idmap, file_path.dentry, DATA_SEC_LEVEL_LABEL, value,
 		value_len);
 	if (err <= 0 && node->devsl >= DATA_SEC_LEVEL3)
 		goto out;
@@ -455,7 +455,7 @@ static void hmdfs_update_open_response(struct hmdfs_peer *con,
 {
 	struct hmdfs_time_t current_time = hmdfs_current_kernel_time();
 	struct hmdfs_time_t ctime = info->stat_valid ? info->stat.ctime :
-						       info->inode->i_ctime;
+						       info->inode->__i_ctime;
 	struct hmdfs_time_t precision =
 		msec_to_timespec(con->sbi->dcache_precision);
 	loff_t size = info->stat_valid ? info->stat.size :
@@ -603,7 +603,7 @@ static int hmdfs_check_and_create(struct path *path_parent,
 	/* if inode doesn't exist, create it */
 	if (d_is_negative(dentry)) {
 		hmdfs_mark_drop_flag(device_id, path_parent->dentry);
-		err = vfs_create(d_inode(path_parent->dentry), dentry, mode,
+		err = vfs_create(&nop_mnt_idmap, d_inode(path_parent->dentry), dentry, mode,
 				 is_excl);
 		if (err)
 			hmdfs_err("create failed, err %d", err);
@@ -950,7 +950,7 @@ static bool hmdfs_server_cache_validate(struct file *filp, struct inode *inode,
 		return false;
 	}
 
-	return !need_rebuild_dcache(&header, inode->i_ctime, precision);
+	return !need_rebuild_dcache(&header, inode->__i_ctime, precision);
 }
 
 struct file *hmdfs_server_cache_revalidate(struct hmdfs_sb_info *sbi,
@@ -993,7 +993,7 @@ bool hmdfs_client_cache_validate(struct hmdfs_sb_info *sbi,
 	header.dentry_ctime = readdir_recv->dentry_ctime;
 	header.dentry_ctime_nsec = readdir_recv->dentry_ctime_nsec;
 
-	return !need_rebuild_dcache(&header, inode->i_ctime,
+	return !need_rebuild_dcache(&header, inode->__i_ctime,
 				    sbi->dcache_precision);
 }
 
@@ -1403,8 +1403,8 @@ struct dir_entry_info {
 	unsigned int d_type;
 };
 
-static int hmdfs_filldir_real(struct dir_context *ctx, const char *name,
-			      int name_len, loff_t offset, u64 ino,
+static bool hmdfs_filldir_real(struct dir_context *ctx, const char *name,
+			      int name_len, long long offset, unsigned long long ino,
 			      unsigned int d_type)
 {
 	int res = 0;
@@ -1479,8 +1479,8 @@ static void hmdfs_server_set_header(struct hmdfs_dcache_header *header,
 	cur_time = current_time(file_inode(dentry_file));
 	header->dcache_crtime = cpu_to_le64(cur_time.tv_sec);
 	header->dcache_crtime_nsec = cpu_to_le64(cur_time.tv_nsec);
-	header->dentry_ctime = cpu_to_le64(inode->i_ctime.tv_sec);
-	header->dentry_ctime_nsec = cpu_to_le64(inode->i_ctime.tv_nsec);
+	header->dentry_ctime = cpu_to_le64(inode->__i_ctime.tv_sec);
+	header->dentry_ctime_nsec = cpu_to_le64(inode->__i_ctime.tv_nsec);
 }
 
 // Get the dentries of target directory
@@ -1638,7 +1638,7 @@ static int hmdfs_notify_change(struct vfsmount *mnt, struct dentry *dentry,
 	/* sdcard_fs need to call setattr2, notify_change will call setattr */
 	return notify_change2(mnt, dentry, attr, delegated_inode);
 #else
-	return notify_change(dentry, attr, delegated_inode);
+	return notify_change(&nop_mnt_idmap, dentry, attr, delegated_inode);
 #endif
 }
 
@@ -1948,9 +1948,9 @@ void hmdfs_server_getxattr(struct hmdfs_peer *con,
 	}
 
 	if (!size)
-		err = vfs_getxattr(path.dentry, name, NULL, size);
+		err = vfs_getxattr(&nop_mnt_idmap, path.dentry, name, NULL, size);
 	else
-		err = vfs_getxattr(path.dentry, name, resp->value, size);
+		err = vfs_getxattr(&nop_mnt_idmap, path.dentry, name, resp->value, size);
 	if (err < 0) {
 		hmdfs_info("getxattr failed err %d", err);
 		goto err_put_path;
@@ -2010,9 +2010,9 @@ void hmdfs_server_setxattr(struct hmdfs_peer *con,
 
 	if (del) {
 		WARN_ON(flags != XATTR_REPLACE);
-		err = vfs_removexattr(path.dentry, name);
+		err = vfs_removexattr(&nop_mnt_idmap, path.dentry, name);
 	} else {
-		err = vfs_setxattr(path.dentry, name, value, size, flags);
+		err = vfs_setxattr(&nop_mnt_idmap, path.dentry, name, value, size, flags);
 	}
 
 	path_put(&path);

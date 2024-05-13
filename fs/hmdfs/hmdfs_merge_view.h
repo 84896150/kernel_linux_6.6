@@ -123,12 +123,12 @@ int merge_lookup_async(struct hmdfs_dentry_info_merge *mdi,
 char *hmdfs_get_real_dname(struct dentry *dentry, int *devid, int *type);
 void lock_root_inode_shared(struct inode *root, bool *locked, bool *down);
 void restore_root_inode_sem(struct inode *root, bool locked, bool down);
-int hmdfs_getattr_merge(const struct path *path, struct kstat *stat,
+int hmdfs_getattr_merge(struct mnt_idmap *idmap, const struct path *path, struct kstat *stat,
 			u32 request_mask, unsigned int flags);
-int hmdfs_setattr_merge(struct dentry *dentry, struct iattr *ia);
+int hmdfs_setattr_merge(struct mnt_idmap *idmap, struct dentry *dentry, struct iattr *ia);
 int hmdfs_rmdir_merge(struct inode *dir, struct dentry *dentry);
 int hmdfs_unlink_merge(struct inode *dir, struct dentry *dentry);
-int hmdfs_rename_merge(struct inode *old_dir, struct dentry *old_dentry,
+int hmdfs_rename_merge(struct mnt_idmap *idmap, struct inode *old_dir, struct dentry *old_dentry,
 		       struct inode *new_dir, struct dentry *new_dentry,
 		       unsigned int flags);
 int do_rename_merge(struct inode *old_dir, struct dentry *old_dentry,

@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/xattr.h>
 #include <linux/err.h>
+#include <linux/filelock.h>
 
 #include "authority/authentication.h"
 #include "comm/transport.h"
@@ -1104,7 +1105,7 @@ static int hmdfs_linkat(struct path *old_path, const char *newname)
 	if (old_path->mnt != new_path.mnt)
 		goto out_dput;
 
-	error = vfs_link(old_path->dentry, new_path.dentry->d_inode, new_dentry,
+	error = vfs_link(old_path->dentry, &nop_mnt_idmap, new_path.dentry->d_inode, new_dentry,
 			 NULL);
 
 out_dput:
@@ -1122,7 +1123,7 @@ static int cache_file_mkdir(const char *name, umode_t mode)
 	if (IS_ERR(dentry))
 		return PTR_ERR(dentry);
 
-	err = vfs_mkdir(d_inode(path.dentry), dentry, mode);
+	err = vfs_mkdir(&nop_mnt_idmap, d_inode(path.dentry), dentry, mode);
 	if (err && err != -EEXIST)
 		hmdfs_err("vfs_mkdir failed, err = %d", err);
 
@@ -1373,7 +1374,7 @@ struct file *cache_file_persistent(struct hmdfs_peer *con, struct file *filp,
 	if (err)
 		goto out;
 
-	err = __vfs_setxattr(file_dentry(filp), file_inode(filp),
+	err = __vfs_setxattr(&nop_mnt_idmap, file_dentry(filp), file_inode(filp),
 			     DENTRY_FILE_XATTR_NAME, relative_path,
 			     strlen(relative_path), 0);
 	if (err) {
@@ -1816,7 +1817,7 @@ out:
 	kfree(fullname);
 }
 
-static int cache_file_iterate(struct dir_context *ctx, const char *name,
+static bool cache_file_iterate(struct dir_context *ctx, const char *name,
 			      int name_len, loff_t offset, u64 ino,
 			      unsigned int d_type)
 {
@@ -1903,7 +1904,7 @@ int delete_dentry_file(struct file *filp)
 
 	if (dentry->d_parent == parent) {
 		dget(dentry);
-		err = vfs_unlink(d_inode(parent), dentry, NULL);
+		err = vfs_unlink(&nop_mnt_idmap, d_inode(parent), dentry, NULL);
 		dput(dentry);
 	}
 	unlock_dir(parent);
@@ -2520,6 +2521,7 @@ static void hmdfs_rename_bak(struct dentry *dentry)
 	struct dentry *lower_parent = NULL;
 	struct dentry *lower_dentry = NULL;
 	struct dentry *new_dentry = NULL;
+	struct renamedata rename_data;
 	char *name = NULL;
 	int len = 0;
 	int err = 0;
@@ -2553,8 +2555,14 @@ static void hmdfs_rename_bak(struct dentry *dentry)
 		goto unlock_parent;
 	}
 
-	err = vfs_rename(d_inode(lower_parent), lower_dentry,
-			 d_inode(lower_parent), new_dentry, NULL, 0);
+	rename_data.old_mnt_idmap  = &nop_mnt_idmap;
+	rename_data.old_dir = d_inode(lower_parent);
+	rename_data.old_dentry = lower_dentry;
+	rename_data.new_mnt_idmap = &nop_mnt_idmap;
+	rename_data.new_dir = d_inode(lower_parent);
+	rename_data.new_dentry = new_dentry;
+	rename_data.flags = 0;
+	err = vfs_rename(&rename_data);
 
 	dput(new_dentry);
 unlock_parent:
@@ -2608,7 +2616,7 @@ int hmdfs_root_unlink(uint64_t device_id, struct path *root_path,
 
 	hmdfs_mark_drop_flag(device_id, path.dentry);
 	ihold(child_inode);
-	err = vfs_unlink(dir, child_dentry, NULL);
+	err = vfs_unlink(&nop_mnt_idmap, dir, child_dentry, NULL);
 	/*
 	 * -EOWNERDEAD means we want to put the file in a specail dir instead of
 	 *  deleting it, specifically dustbin in phone, so that user can
@@ -2661,7 +2669,7 @@ struct dentry *hmdfs_root_mkdir(uint64_t device_id, const char *local_dst_path,
 	}
 
 	hmdfs_mark_drop_flag(device_id, child_dentry->d_parent);
-	err = vfs_mkdir(d_inode(path.dentry), child_dentry, mode);
+	err = vfs_mkdir(&nop_mnt_idmap, d_inode(path.dentry), child_dentry, mode);
 	if (err) {
 		hmdfs_err("mkdir failed! err=%d", err);
 		ret = ERR_PTR(err);
@@ -2706,7 +2714,7 @@ struct dentry *hmdfs_root_create(uint64_t device_id, const char *local_dst_path,
 		goto out;
 	}
 	hmdfs_mark_drop_flag(device_id, child_dentry->d_parent);
-	err = vfs_create(d_inode(path.dentry), child_dentry, mode, want_excl);
+	err = vfs_create(&nop_mnt_idmap, d_inode(path.dentry), child_dentry, mode, want_excl);
 	if (err) {
 		hmdfs_err("path create failed! err=%d", err);
 		ret = ERR_PTR(err);
@@ -2752,7 +2760,7 @@ int hmdfs_root_rmdir(uint64_t device_id, struct path *root_path,
 	}
 
 	hmdfs_mark_drop_flag(device_id, path.dentry);
-	err = vfs_rmdir(dir, child_dentry);
+	err = vfs_rmdir(&nop_mnt_idmap, dir, child_dentry);
 	if (err)
 		hmdfs_err("rmdir failed err = %d", err);
 	dput(child_dentry);
@@ -2775,6 +2783,7 @@ int hmdfs_root_rename(struct hmdfs_sb_info *sbi, uint64_t device_id,
 	struct dentry *trap = NULL;
 	struct dentry *old_dentry = NULL;
 	struct dentry *new_dentry = NULL;
+	struct renamedata rename_data;
 
 	err = kern_path(sbi->local_dst, 0, &path_dst);
 	if (err) {
@@ -2843,8 +2852,14 @@ int hmdfs_root_rename(struct hmdfs_sb_info *sbi, uint64_t device_id,
 	if (path_old.dentry != path_new.dentry)
 		hmdfs_mark_drop_flag(device_id, path_new.dentry);
 
-	err = vfs_rename(d_inode(path_old.dentry), old_dentry,
-			 d_inode(path_new.dentry), new_dentry, NULL, 0);
+	rename_data.old_mnt_idmap = &nop_mnt_idmap;
+	rename_data.old_dir = d_inode(path_old.dentry);
+	rename_data.old_dentry = old_dentry;
+	rename_data.new_mnt_idmap = &nop_mnt_idmap;
+	rename_data.new_dir = d_inode(path_new.dentry);
+	rename_data.new_dentry = new_dentry;
+	rename_data.flags = flags;
+	err = vfs_rename(&rename_data);
 
 put_new_dentry:
 	dput(new_dentry);

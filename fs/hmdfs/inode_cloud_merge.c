@@ -367,7 +367,7 @@ int do_mkdir_cloud_merge(struct inode *parent_inode, struct dentry *child_dentry
 	struct super_block *sb = parent_inode->i_sb;
 	struct inode *child_inode = NULL;
 
-	ret = vfs_mkdir(lo_i_parent, lo_d_child, mode);
+	ret = vfs_mkdir(&nop_mnt_idmap, lo_i_parent, lo_d_child, mode);
 	if (ret)
 		goto out;
 
@@ -394,7 +394,7 @@ int do_create_cloud_merge(struct inode *parent_inode, struct dentry *child_dentr
 	struct super_block *sb = parent_inode->i_sb;
 	struct inode *child_inode = NULL;
 
-	ret = vfs_create(lo_i_parent, lo_d_child, mode, want_excl);
+	ret = vfs_create(&nop_mnt_idmap, lo_i_parent, lo_d_child, mode, want_excl);
 	if (ret)
 		goto out;
 
@@ -437,7 +437,7 @@ int hmdfs_do_ops_cloud_merge(struct inode *i_parent, struct dentry *d_child,
 			break;
 		}
 	} else {
-		ret = vfs_mkdir(d_inode(path.dentry), lo_d_child,
+		ret = vfs_mkdir(&nop_mnt_idmap, d_inode(path.dentry), lo_d_child,
 				rec_op_para->mode);
 	}
 	if (ret)
@@ -578,7 +578,7 @@ out:
 	return ret;
 }
 
-int hmdfs_mkdir_cloud_merge(struct inode *dir, struct dentry *dentry, umode_t mode)
+int hmdfs_mkdir_cloud_merge(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	int ret = 0;
 	struct hmdfs_recursive_para *rec_op_para = NULL;
@@ -605,7 +605,7 @@ out:
 	return ret;
 }
 
-int hmdfs_create_cloud_merge(struct inode *dir, struct dentry *dentry, umode_t mode,
+int hmdfs_create_cloud_merge(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode,
 		       bool want_excl)
 {
 	struct hmdfs_recursive_para *rec_op_para = NULL;
@@ -660,7 +660,7 @@ out:
 	return ret;
 }
 
-static int hmdfs_rename_cloud_merge(struct inode *old_dir,
+static int hmdfs_rename_cloud_merge(struct mnt_idmap *idmap, struct inode *old_dir,
 				    struct dentry *old_dentry,
 				    struct inode *new_dir,
 				    struct dentry *new_dentry,
@@ -710,7 +710,7 @@ rename_out:
 
 void hmdfs_update_meta(struct inode *dir)
 {
-	dir->i_ctime = dir->i_mtime = current_time(dir);
+	dir->__i_ctime = dir->i_mtime = current_time(dir);
 }
 
 const struct inode_operations hmdfs_dir_iops_cloud_merge = {

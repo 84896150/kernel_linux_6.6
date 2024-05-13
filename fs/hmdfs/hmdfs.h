@@ -302,7 +302,7 @@ extern ssize_t hmdfs_remote_listxattr(struct dentry *dentry, char *buffer,
 
 int check_filename(const char *name, int len);
 
-int hmdfs_permission(struct inode *inode, int mask);
+int hmdfs_permission(struct mnt_idmap *idmap, struct inode *inode, int mask);
 
 int hmdfs_parse_options(struct hmdfs_sb_info *sbi, const char *data);
 

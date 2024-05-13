@@ -94,20 +94,44 @@ static void hmdfs_writeback_inode(struct super_block *sb, struct inode *inode)
 
 static unsigned long hmdfs_idirty_pages(struct inode *inode, int tag)
 {
+#if KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE
+	struct folio_batch fbatch;
+#else
 	struct pagevec pvec;
+#endif
 	unsigned long nr_dirty_pages = 0;
 	pgoff_t index = 0;
 
 #if KERNEL_VERSION(4, 15, 0) <= LINUX_VERSION_CODE
+#if KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE
+	folio_batch_init(&fbatch);
+#else
 	pagevec_init(&pvec);
+#endif
 #else
 	pagevec_init(&pvec, 0);
 #endif
+
+#if KERNEL_VERSION(6, 3, 0) <= LINUX_VERSION_CODE
+	while (filemap_get_folios_tag(inode->i_mapping, &index, 
+	        (pgoff_t)-1, tag, &fbatch)) {
+		for (int i = 0; i < fbatch.nr; i++) {
+			struct folio *folio = fbatch.folios[i];
+			if (folio_test_dirty(folio) || folio_test_writeback(folio)) {
+				nr_dirty_pages++;
+			}
+		}
+		folio_batch_release(&fbatch);
+		cond_resched();
+	}
+#else
 	while (pagevec_lookup_tag(&pvec, inode->i_mapping, &index, tag)) {
 		nr_dirty_pages += pagevec_count(&pvec);
 		pagevec_release(&pvec);
 		cond_resched();
 	}
+#endif
+
 	return nr_dirty_pages;
 }
 

@@ -174,8 +174,8 @@ out_err:
 	if (pages_buf)
 		vunmap(pages_buf);
 	for (idx = 0; idx < cnt; ++idx) {
-		ClearPageUptodate(vec[idx]);
-		delete_from_page_cache(vec[idx]);
+		folio_clear_uptodate((struct folio *)vec[idx]);
+		filemap_remove_folio((struct folio *)vec[idx]);
 		unlock_page(vec[idx]);
 		put_page(vec[idx]);
 	}
@@ -183,11 +183,11 @@ out:
 	return ret;
 }
 
-static int hmdfs_readpages_cloud(struct file *filp,
-				 struct address_space *mapping,
-				 struct list_head *pages,
-				 unsigned int nr_pages)
+static void hmdfs_readahead(struct readahead_control *ractl)
 {
+	struct file *filp = ractl->file;
+	struct address_space *mapping = ractl->mapping;
+	unsigned int nr_pages = readahead_count(ractl);
 	struct hmdfs_sb_info *sbi = hmdfs_sb(file_inode(filp)->i_sb);
 	unsigned int ret = 0, idx, cnt, limit;
 	unsigned long next_index;
@@ -198,15 +198,14 @@ static int hmdfs_readpages_cloud(struct file *filp,
 	vec = kmalloc(limit * sizeof(*vec), GFP_KERNEL);
 	if (!vec) {
 		hmdfs_warning("cannot alloc vec (%u pages)", limit);
-		return -ENOMEM;
+		return;
 	}
 
 	cnt = 0;
 	next_index = 0;
 	for (idx = 0; idx < nr_pages; ++idx) {
-		struct page *page = lru_to_page(pages);
+		struct page *page = readahead_page(ractl);
 
-		list_del(&page->lru);
 		if (add_to_page_cache_lru(page, mapping, page->index, gfp)) {
 			unlock_page(page);
 			put_page(page);
@@ -227,8 +226,8 @@ static int hmdfs_readpages_cloud(struct file *filp,
 		ret = hmdfs_do_readpages_cloud(filp, cnt, vec);
 
 	kfree(vec);
-	trace_hmdfs_readpages_cloud(nr_pages, pages);
-	return ret;
+	trace_hmdfs_readpages_cloud(nr_pages, ret);
+	return;
 }
 
 static int hmdfs_readpage(struct file *file, struct page *page)
@@ -262,6 +261,12 @@ out:
 	return ret;
 }
 
+static int hmdfs_read_folio(struct file *file, struct folio *folio)
+{
+	struct page *page = &folio->page;
+	return hmdfs_readpage(file, page);
+}
+
 const struct file_operations hmdfs_dev_file_fops_cloud = {
 	.owner = THIS_MODULE,
 	.llseek = generic_file_llseek,
@@ -278,17 +283,17 @@ const struct file_operations hmdfs_dev_file_fops_cloud = {
 
 
 const struct address_space_operations hmdfs_dev_file_aops_cloud = {
-	.readpage = hmdfs_readpage,
-	.readpages = hmdfs_readpages_cloud,
+	.read_folio = hmdfs_read_folio,
+	.readahead = hmdfs_readahead,
 	.write_begin = NULL,
 	.write_end = NULL,
 	.writepage = NULL,
-	.set_page_dirty = NULL,
+	.dirty_folio = NULL,
 };
 
 const struct address_space_operations hmdfs_aops_cloud = {
-	.readpage = hmdfs_readpage,
-	.readpages = hmdfs_readpages_cloud,
+	.read_folio = hmdfs_read_folio,
+	.readahead = hmdfs_readahead,
 };
 
 int analysis_dentry_file_from_cloud(struct hmdfs_sb_info *sbi,
@@ -413,7 +418,7 @@ static int hmdfs_dir_release_cloud(struct inode *inode, struct file *file)
 
 const struct file_operations hmdfs_dev_dir_ops_cloud = {
 	.owner = THIS_MODULE,
-	.iterate = hmdfs_iterate_cloud,
+	.iterate_shared = hmdfs_iterate_cloud,
 	.open = hmdfs_dir_open_cloud,
 	.release = hmdfs_dir_release_cloud,
 	.fsync = __generic_file_fsync,

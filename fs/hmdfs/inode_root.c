@@ -48,7 +48,7 @@ static struct inode *fill_device_local_inode(struct super_block *sb,
 	inode->i_gid = KGIDT_INIT((gid_t)1000);
 
 	inode->i_atime = lower_inode->i_atime;
-	inode->i_ctime = lower_inode->i_ctime;
+	inode->__i_ctime = lower_inode->__i_ctime;
 	inode->i_mtime = lower_inode->i_mtime;
 
 	inode->i_op = &hmdfs_dir_inode_ops_local;
@@ -305,7 +305,7 @@ struct inode *fill_device_inode(struct super_block *sb,
 	info->inode_type = HMDFS_LAYER_FIRST_DEVICE;
 
 	inode->i_atime = lower_inode->i_atime;
-	inode->i_ctime = lower_inode->i_ctime;
+	inode->__i_ctime = lower_inode->__i_ctime;
 	inode->i_mtime = lower_inode->i_mtime;
 
 	inode->i_mode = (lower_inode->i_mode & S_IFMT) | S_IRUSR | S_IXUSR |
@@ -367,7 +367,7 @@ struct inode *fill_root_inode(struct super_block *sb, struct hmdfs_sb_info *sbi,
 	inode->i_gid = KGIDT_INIT((gid_t)1000);
 #endif
 	inode->i_atime = lower_inode->i_atime;
-	inode->i_ctime = lower_inode->i_ctime;
+	inode->__i_ctime = lower_inode->__i_ctime;
 	inode->i_mtime = lower_inode->i_mtime;
 	
 	fsstack_copy_inode_size(inode, lower_inode);

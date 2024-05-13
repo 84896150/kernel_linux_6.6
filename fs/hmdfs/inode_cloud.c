@@ -230,8 +230,8 @@ struct inode *fill_inode_cloud(struct super_block *sb, struct hmdfs_lookup_cloud
 		return inode;
 	}
 
-	inode->i_ctime.tv_sec = 0;
-	inode->i_ctime.tv_nsec = 0;
+	inode->__i_ctime.tv_sec = 0;
+	inode->__i_ctime.tv_nsec = 0;
 	inode->i_mtime.tv_sec = res->i_mtime;
 	inode->i_mtime.tv_nsec = 0;
 
@@ -346,12 +346,12 @@ out:
 	return ret;
 }
 
-int hmdfs_mkdir_cloud(struct inode *dir, struct dentry *dentry, umode_t mode)
+int hmdfs_mkdir_cloud(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	return -EPERM;
 }
 
-int hmdfs_create_cloud(struct inode *dir, struct dentry *dentry, umode_t mode,
+int hmdfs_create_cloud(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode,
 			bool want_excl)
 {
 	return -EPERM;
@@ -367,14 +367,14 @@ int hmdfs_unlink_cloud(struct inode *dir, struct dentry *dentry)
 	return 0;
 }
 
-int hmdfs_rename_cloud(struct inode *old_dir, struct dentry *old_dentry,
+int hmdfs_rename_cloud(struct mnt_idmap *idmap, struct inode *old_dir, struct dentry *old_dentry,
 			struct inode *new_dir, struct dentry *new_dentry,
 			unsigned int flags)
 {
 	return -EPERM;
 }
 
-static int hmdfs_dir_setattr_cloud(struct dentry *dentry, struct iattr *ia)
+static int hmdfs_dir_setattr_cloud(struct mnt_idmap *idmap, struct dentry *dentry, struct iattr *ia)
 {
 	// Do not support dir setattr
 	return 0;
@@ -391,7 +391,7 @@ const struct inode_operations hmdfs_dev_dir_inode_ops_cloud = {
 	.permission = hmdfs_permission,
 };
 
-static int hmdfs_setattr_cloud(struct dentry *dentry, struct iattr *ia)
+static int hmdfs_setattr_cloud(struct mnt_idmap *idmap, struct dentry *dentry, struct iattr *ia)
 {
 	struct hmdfs_inode_info *info = hmdfs_i(d_inode(dentry));
 	struct inode *inode = d_inode(dentry);
@@ -414,7 +414,7 @@ static int hmdfs_setattr_cloud(struct dentry *dentry, struct iattr *ia)
 }
 
 
-static int hmdfs_get_cached_attr_cloud(const struct path *path,
+static int hmdfs_get_cached_attr_cloud(struct mnt_idmap *idmap, const struct path *path,
 					struct kstat *stat, u32 request_mask,
 					unsigned int flags)
 {

@@ -70,7 +70,7 @@ void update_inode_attr(struct inode *inode, struct dentry *child_dentry)
 
 		if (comrade == fst_comrade) {
 			inode->i_atime = li->i_atime;
-			inode->i_ctime = li->i_ctime;
+			inode->__i_ctime = li->__i_ctime;
 			inode->i_mtime = li->i_mtime;
 			inode->i_size = li->i_size;
 			continue;
@@ -770,7 +770,7 @@ out:
 	return err ? ERR_PTR(err) : ret_dentry;
 }
 
-int hmdfs_getattr_merge(const struct path *path, struct kstat *stat,
+int hmdfs_getattr_merge(struct mnt_idmap *idmap, const struct path *path, struct kstat *stat,
 			       u32 request_mask, unsigned int flags)
 {
 	int ret;
@@ -791,7 +791,7 @@ out:
 	return ret;
 }
 
-int hmdfs_setattr_merge(struct dentry *dentry, struct iattr *ia)
+int hmdfs_setattr_merge(struct mnt_idmap *idmap, struct dentry *dentry, struct iattr *ia)
 {
 	struct inode *inode = d_inode(dentry);
 	struct dentry *lower_dentry = hmdfs_get_fst_lo_d(dentry);
@@ -816,11 +816,11 @@ int hmdfs_setattr_merge(struct dentry *dentry, struct iattr *ia)
 	inode_lock(lower_inode);
 	tmp_uid = hmdfs_override_inode_uid(lower_inode);
 
-	err = notify_change(lower_dentry, &lower_ia, NULL);
+	err = notify_change(&nop_mnt_idmap, lower_dentry, &lower_ia, NULL);
 	i_size_write(inode, i_size_read(lower_inode));
 	inode->i_atime = lower_inode->i_atime;
 	inode->i_mtime = lower_inode->i_mtime;
-	inode->i_ctime = lower_inode->i_ctime;
+	inode->__i_ctime = lower_inode->__i_ctime;
 	hmdfs_revert_inode_uid(lower_inode, tmp_uid);
 
 	inode_unlock(lower_inode);
@@ -844,7 +844,7 @@ int do_mkdir_merge(struct inode *parent_inode, struct dentry *child_dentry,
 	struct super_block *sb = parent_inode->i_sb;
 	struct inode *child_inode = NULL;
 
-	ret = vfs_mkdir(lo_i_parent, lo_d_child, mode);
+	ret = vfs_mkdir(&nop_mnt_idmap, lo_i_parent, lo_d_child, mode);
 	if (ret)
 		goto out;
 
@@ -872,7 +872,7 @@ int do_create_merge(struct inode *parent_inode, struct dentry *child_dentry,
 	struct super_block *sb = parent_inode->i_sb;
 	struct inode *child_inode = NULL;
 
-	ret = vfs_create(lo_i_parent, lo_d_child, mode, want_excl);
+	ret = vfs_create(&nop_mnt_idmap, lo_i_parent, lo_d_child, mode, want_excl);
 	if (ret)
 		goto out;
 
@@ -916,7 +916,7 @@ int hmdfs_do_ops_merge(struct inode *i_parent, struct dentry *d_child,
 			break;
 		}
 	} else {
-		ret = vfs_mkdir(d_inode(path.dentry), lo_d_child,
+		ret = vfs_mkdir(&nop_mnt_idmap, d_inode(path.dentry), lo_d_child,
 				rec_op_para->mode);
 	}
 	if (ret)
@@ -1074,7 +1074,7 @@ void hmdfs_init_recursive_para(struct hmdfs_recursive_para *rec_op_para,
 	rec_op_para->name = name;
 }
 
-int hmdfs_mkdir_merge(struct inode *dir, struct dentry *dentry, umode_t mode)
+int hmdfs_mkdir_merge(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	int ret = 0;
 	struct hmdfs_recursive_para *rec_op_para = NULL;
@@ -1101,7 +1101,7 @@ out:
 	return ret;
 }
 
-int hmdfs_create_merge(struct inode *dir, struct dentry *dentry, umode_t mode,
+int hmdfs_create_merge(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode,
 		       bool want_excl)
 {
 	struct hmdfs_recursive_para *rec_op_para = NULL;
@@ -1140,7 +1140,7 @@ int do_rmdir_merge(struct inode *dir, struct dentry *dentry)
 		lo_d = comrade->lo_d;
 		lo_d_dir = lock_parent(lo_d);
 		lo_i_dir = d_inode(lo_d_dir);
-		ret = vfs_rmdir(lo_i_dir, lo_d);
+		ret = vfs_rmdir(&nop_mnt_idmap, lo_i_dir, lo_d);
 		unlock_dir(lo_d_dir);
 		if (ret)
 			break;
@@ -1200,7 +1200,7 @@ int do_unlink_merge(struct inode *dir, struct dentry *dentry)
 			break;
 		}
 		lo_i_dir = d_inode(lo_d_dir);
-		ret = vfs_unlink(lo_i_dir, lo_d_lookup, NULL);
+		ret = vfs_unlink(&nop_mnt_idmap, lo_i_dir, lo_d_lookup, NULL);
 		dput(lo_d_lookup);
 		unlock_dir(lo_d_dir);
 		dput(lo_d);
@@ -1251,6 +1251,7 @@ int do_rename_merge(struct inode *old_dir, struct dentry *old_dentry,
 	char *abs_path_buf = kmalloc(PATH_MAX, GFP_KERNEL);
 	char *path_name = NULL;
 	struct hmdfs_dentry_info_merge *pmdi = NULL;
+	struct renamedata rename_data;
 
 	if (flags & ~RENAME_NOREPLACE) {
 		ret = -EINVAL;
@@ -1306,8 +1307,15 @@ int do_rename_merge(struct inode *old_dir, struct dentry *old_dentry,
 		lo_d_old_dir = dget_parent(lo_d_old);
 		lo_i_old_dir = d_inode(lo_d_old_dir);
 
-		ret = vfs_rename(lo_i_old_dir, lo_d_old, lo_i_new_dir, lo_d_new,
-				 NULL, flags);
+		rename_data.old_mnt_idmap = &nop_mnt_idmap;
+		rename_data.old_dir = lo_i_old_dir;
+		rename_data.old_dentry = lo_d_old;
+		rename_data.new_mnt_idmap  = &nop_mnt_idmap;
+		rename_data.new_dir = lo_i_new_dir;
+		rename_data.new_dentry = lo_d_new;
+		rename_data.flags = flags;
+		ret = vfs_rename(&rename_data);
+
 		new_comrade = alloc_comrade(lo_p_new.dentry, comrade->dev_id);
 		if (IS_ERR(new_comrade)) {
 			ret = PTR_ERR(new_comrade);
@@ -1326,7 +1334,7 @@ out:
 	return ret;
 }
 
-int hmdfs_rename_merge(struct inode *old_dir, struct dentry *old_dentry,
+int hmdfs_rename_merge(struct mnt_idmap *idmap, struct inode *old_dir, struct dentry *old_dentry,
 		       struct inode *new_dir, struct dentry *new_dentry,
 		       unsigned int flags)
 {

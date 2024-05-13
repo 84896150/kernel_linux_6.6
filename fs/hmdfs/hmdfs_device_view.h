@@ -141,7 +141,7 @@ struct dentry *hmdfs_lookup_local(struct inode *parent_inode,
 struct dentry *hmdfs_lookup_remote(struct inode *parent_inode,
 				   struct dentry *child_dentry,
 				   unsigned int flags);
-int hmdfs_symlink_local(struct inode *dir, struct dentry *dentry,
+int hmdfs_symlink_local(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry,
 			const char *symname);
 int hmdfs_fsync_local(struct file *file, loff_t start, loff_t end,
 		      int datasync);
