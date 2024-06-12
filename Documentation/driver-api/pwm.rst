@@ -35,9 +35,12 @@ consumers to providers, as given in the following example::
 Using PWMs
 ----------
 
-Consumers use the pwm_get() function and pass to it the consumer device or a
-consumer name. pwm_put() is used to free the PWM device. Managed variants of
-the getter, devm_pwm_get() and devm_fwnode_pwm_get(), also exist.
+Legacy users can request a PWM device using pwm_request() and free it
+after usage with pwm_free().
+
+New users should use the pwm_get() function and pass to it the consumer
+device or a consumer name. pwm_put() is used to free the PWM device. Managed
+variants of the getter, devm_pwm_get() and devm_fwnode_pwm_get(), also exist.
 
 After being requested, a PWM has to be configured using::
 
