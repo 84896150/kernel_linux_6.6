@@ -39,6 +39,8 @@
 				<policyitem type="compatibility" name="GCC-exception-2.0" path=".*" desc="linux kernel license"/>
 				<policyitem type="compatibility" name="GPL-COMPATIBLE-ID" path=".*" desc="linux kernel license"/>
 				<policyitem type="copyright" name="Huawei Device Co., Ltd." path="fs/hmdfs/.*" desc="huawei copyright"/>
+				<policyitem type="copyright" name="Google, Inc." path=".*" desc="google copyright"/>
+				<policyitem type="copyright" name="Rockchip Electronics Co. Ltd." path=".*" desc="rockchip copyright"/>
             </policy>
         </policylist>
         <filefilterlist>
@@ -547,6 +549,24 @@
 				<filteritem type="filepath" name="fs/sharefs/authentication.c" desc="shield"/>
 				<filteritem type="filepath" name="fs/sharefs/config.c" desc="shield"/>
 				<filteritem type="filepath" name="fs/sharefs/file.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/ion_buffer.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/uapi/ion.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/ion_heap.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/ion_dma_buf.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/heaps/ion_cma_heap.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/TODO" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ashmem.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/heaps/ion_page_pool.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/ion_protected_heap.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/ion_private.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/ion.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/heaps/ion_page_pool.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/ion_trace.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ion/heaps/ion_system_heap.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/android/ashmem.h" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/blackbox/blackbox_storage.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/blackbox/blackbox_common.c" desc="shield"/>
+				<filteritem type="filepath" name="drivers/staging/blackbox/blackbox_core.c" desc="shield"/>
             </filefilter>
         </filefilterlist>
     </oatconfig>
