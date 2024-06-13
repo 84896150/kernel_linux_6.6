@@ -58,6 +58,22 @@
 #include "autogroup.h"
 
 /*
+ * Targeted preemption latency for CPU-bound tasks:
+ *
+ * NOTE: this latency value is not the same as the concept of
+ * 'timeslice length' - timeslices in CFS are of variable length
+ * and have no persistent notion like in traditional, time-slice
+ * based scheduling concepts.
+ *
+ * (to see the precise effective timeslice length of your workload,
+ *  run vmstat and monitor the context-switches (cs) field)
+ *
+ * (default: 6ms * (1 + ilog(ncpus)), units: nanoseconds)
+ */
+unsigned int sysctl_sched_latency			= 6000000ULL;
+static unsigned int normalized_sysctl_sched_latency	= 6000000ULL;
+
+/*
  * The initial- and re-scaling of tunables is configurable
  *
  * Options are:
@@ -79,10 +95,27 @@ unsigned int sysctl_sched_base_slice			= 750000ULL;
 static unsigned int normalized_sysctl_sched_base_slice	= 750000ULL;
 
 /*
+ * This value is kept at sysctl_sched_latency/sysctl_sched_min_granularity
+ */
+static unsigned int sched_nr_latency = 8;
+
+/*
  * After fork, child runs first. If set to 0 (default) then
  * parent will (try to) run first.
  */
 unsigned int sysctl_sched_child_runs_first __read_mostly;
+
+/*
+ * SCHED_OTHER wake-up granularity.
+ *
+ * This option delays the preemption effects of decoupled workloads
+ * and reduces their over-scheduling. Synchronous workloads will still
+ * have immediate wakeup/sleep latencies.
+ *
+ * (default: 1 msec * (1 + ilog(ncpus)), units: nanoseconds)
+ */
+unsigned int sysctl_sched_wakeup_granularity			= 1000000UL;
+static unsigned int normalized_sysctl_sched_wakeup_granularity	= 1000000UL;
 
 const_debug unsigned int sysctl_sched_migration_cost	= 500000UL;
 
@@ -238,6 +271,8 @@ static void update_sysctl(void)
 #define SET_SYSCTL(name) \
 	(sysctl_##name = (factor) * normalized_sysctl_##name)
 	SET_SYSCTL(sched_base_slice);
+	SET_SYSCTL(sched_latency);
+	SET_SYSCTL(sched_wakeup_granularity);
 #undef SET_SYSCTL
 }
 
@@ -1003,6 +1038,8 @@ int sched_update_scaling(void)
 #define WRT_SYSCTL(name) \
 	(normalized_sysctl_##name = sysctl_##name / (factor))
 	WRT_SYSCTL(sched_base_slice);
+	WRT_SYSCTL(sched_latency);
+	WRT_SYSCTL(sched_wakeup_granularity);
 #undef WRT_SYSCTL
 
 	return 0;
@@ -5348,6 +5385,9 @@ set_next_entity(struct cfs_rq *cfs_rq, struct sched_entity *se)
 	se->prev_sum_exec_runtime = se->sum_exec_runtime;
 }
 
+static int
+wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se);
+
 /*
  * Pick the next process, keeping these things in mind, in this order:
  * 1) keep things fair between processes/task groups
@@ -6590,6 +6630,37 @@ static int sched_idle_cpu(int cpu)
 }
 #endif
 
+static void set_next_buddy(struct sched_entity *se);
+
+#ifdef CONFIG_SCHED_LATENCY_NICE
+static void check_preempt_from_idle(struct cfs_rq *cfs, struct sched_entity *se)
+{
+	struct sched_entity *next;
+
+	if (se->latency_weight <= 0)
+		return;
+
+	if (cfs->nr_running <= 1)
+		return;
+	/*
+	 * When waking from idle, we don't need to check to preempt at wakeup
+	 * the idle thread and don't set next buddy as a candidate for being
+	 * picked in priority.
+	 * In case of simultaneous wakeup from idle, the latency sensitive tasks
+	 * lost opportunity to preempt non sensitive tasks which woke up
+	 * simultaneously.
+	 */
+
+	if (cfs->next)
+		next = cfs->next;
+	else
+		next = __pick_first_entity(cfs);
+
+	if (next && wakeup_preempt_entity(next, se) == 1)
+		set_next_buddy(se);
+}
+#endif
+
 /*
  * The enqueue_task method is called before nr_running is
  * increased. Here we update the fair scheduling stats and
@@ -6675,6 +6746,11 @@ enqueue_task_fair(struct rq *rq, struct task_struct *p, int flags)
 	 */
 	if (!task_new)
 		update_overutilized_status(rq);
+
+#ifdef CONFIG_SCHED_LATENCY_NICE
+	if (rq->curr == rq->idle)
+		check_preempt_from_idle(cfs_rq_of(&p->se), &p->se);
+#endif
 
 enqueue_throttle:
 	assert_list_leaf_cfs_rq(rq);
@@ -8125,6 +8201,93 @@ balance_fair(struct rq *rq, struct task_struct *prev, struct rq_flags *rf)
 	return newidle_balance(rq, rf) != 0;
 }
 #endif /* CONFIG_SMP */
+
+#ifdef CONFIG_SCHED_LATENCY_NICE
+static long wakeup_latency_gran(struct sched_entity *curr, struct sched_entity *se)
+{
+	int latency_weight = se->latency_weight;
+	long thresh = sysctl_sched_latency;
+
+	/*
+	 * A positive latency weigth means that the sched_entity has latency
+	 * requirement that needs to be evaluated versus other entity.
+	 * Otherwise, use the latency weight to evaluate how much scheduling
+	 * delay is acceptable by se.
+	 */
+	if ((se->latency_weight > 0) || (curr->latency_weight > 0))
+		latency_weight -= curr->latency_weight;
+
+	if (!latency_weight)
+		return 0;
+
+	if (sched_feat(GENTLE_FAIR_SLEEPERS))
+		thresh >>= 1;
+
+	/*
+	 * Clamp the delta to stay in the scheduler period range
+	 * [-sysctl_sched_latency:sysctl_sched_latency]
+	 */
+	latency_weight = clamp_t(long, latency_weight,
+				-1 * NICE_LATENCY_WEIGHT_MAX,
+				NICE_LATENCY_WEIGHT_MAX);
+
+	return (thresh * latency_weight) >> NICE_LATENCY_SHIFT;
+}
+#endif
+
+static unsigned long wakeup_gran(struct sched_entity *se)
+{
+	unsigned long gran = sysctl_sched_wakeup_granularity;
+
+	/*
+	 * Since its curr running now, convert the gran from real-time
+	 * to virtual-time in his units.
+	 *
+	 * By using 'se' instead of 'curr' we penalize light tasks, so
+	 * they get preempted easier. That is, if 'se' < 'curr' then
+	 * the resulting gran will be larger, therefore penalizing the
+	 * lighter, if otoh 'se' > 'curr' then the resulting gran will
+	 * be smaller, again penalizing the lighter task.
+	 *
+	 * This is especially important for buddies when the leftmost
+	 * task is higher priority than the buddy.
+	 */
+	return calc_delta_fair(gran, se);
+}
+
+/*
+ * Should 'se' preempt 'curr'.
+ *
+ *             |s1
+ *        |s2
+ *   |s3
+ *         g
+ *      |<--->|c
+ *
+ *  w(c, s1) = -1
+ *  w(c, s2) =  0
+ *  w(c, s3) =  1
+ *
+ */
+static int
+wakeup_preempt_entity(struct sched_entity *curr, struct sched_entity *se)
+{
+	s64 gran, vdiff = curr->vruntime - se->vruntime;
+
+#ifdef CONFIG_SCHED_LATENCY_NICE
+	/* Take into account latency priority */
+	vdiff += wakeup_latency_gran(curr, se);
+#endif
+
+	if (vdiff <= 0)
+		return -1;
+
+	gran = wakeup_gran(se);
+	if (vdiff > gran)
+		return 1;
+
+	return 0;
+}
 
 static void set_next_buddy(struct sched_entity *se)
 {
