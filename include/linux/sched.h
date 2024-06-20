@@ -575,6 +575,10 @@ struct sched_entity {
 	unsigned long			runnable_weight;
 #endif
 
+#ifdef CONFIG_SCHED_LATENCY_NICE
+	int				latency_weight;
+#endif
+
 #ifdef CONFIG_SMP
 	/*
 	 * Per entity load average tracking.
@@ -790,6 +794,9 @@ struct task_struct {
 	int				static_prio;
 	int				normal_prio;
 	unsigned int			rt_priority;
+#ifdef CONFIG_SCHED_LATENCY_NICE
+	int				latency_prio;
+#endif
 
 	struct sched_entity		se;
 	struct sched_rt_entity		rt;
@@ -1745,6 +1752,7 @@ extern struct pid *cad_pid;
 #define PF_USER_WORKER		0x00004000	/* Kernel thread cloned from userspace thread */
 #define PF_NOFREEZE		0x00008000	/* This thread should not be frozen */
 #define PF__HOLE__00010000	0x00010000
+#define PF_FROZEN		PF__HOLE__00010000	/* Frozen for system suspend */
 #define PF_KSWAPD		0x00020000	/* I am kswapd */
 #define PF_MEMALLOC_NOFS	0x00040000	/* All allocation requests will inherit GFP_NOFS */
 #define PF_MEMALLOC_NOIO	0x00080000	/* All allocation requests will inherit GFP_NOIO */
