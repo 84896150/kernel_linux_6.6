@@ -46,7 +46,6 @@ typedef unsigned int __bitwise gfp_t;
 #define ___GFP_THISNODE		0x200000u
 #define ___GFP_ACCOUNT		0x400000u
 #define ___GFP_ZEROTAGS		0x800000u
-#define ___GFP_CMA		0x800000u
 #ifdef CONFIG_KASAN_HW_TAGS
 #define ___GFP_SKIP_ZERO	0x1000000u
 #define ___GFP_SKIP_KASAN	0x2000000u
@@ -54,9 +53,10 @@ typedef unsigned int __bitwise gfp_t;
 #define ___GFP_SKIP_ZERO	0
 #define ___GFP_SKIP_KASAN	0
 #endif
+#define ___GFP_CMA		0x4000000u
 #ifdef CONFIG_LOCKDEP
+#define ___GFP_NOLOCKDEP	0x8000000u
 /*#define ___GFP_NOLOCKDEP	0x4000000u*/
-#define ___GFP_NOLOCKDEP	0x1000000u
 #else
 #define ___GFP_NOLOCKDEP	0
 #endif
