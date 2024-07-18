@@ -62,7 +62,7 @@ enum migratetype {
 	 * pageblocks to MIGRATE_CMA which can be done by
 	 * __free_pageblock_cma() function.
 	 */
-	MIGRATE_CMA,
+    MIGRATE_CMA,
 #endif
 #ifdef CONFIG_MEMORY_ISOLATION
 	MIGRATE_ISOLATE,	/* can't allocate from here */

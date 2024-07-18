@@ -2090,10 +2090,10 @@ retry:
 	page = __rmqueue_smallest(zone, order, migratetype);
 
     if (unlikely(!page) && is_migrate_cma(migratetype)) {
-		migratetype = MIGRATE_MOVABLE;
+        migratetype = MIGRATE_MOVABLE;
         alloc_flags &= ~ALLOC_CMA;
         page = __rmqueue_smallest(zone, order, migratetype);
-	}
+    }
 
     if (unlikely(!page) &&
 		__rmqueue_fallback(zone, order, migratetype, alloc_flags))
@@ -2805,9 +2805,9 @@ struct page *rmqueue(struct zone *preferred_zone,
 	 */
 	WARN_ON_ONCE((gfp_flags & __GFP_NOFAIL) && (order > 1));
 
-        if ((!IS_ENABLED(CONFIG_CMA) || (alloc_flags & ALLOC_CMA)) || 
+        if ( (!IS_ENABLED(CONFIG_CMA) || (alloc_flags & ALLOC_CMA)) || 
             (migratetype != M_MOVABLE) || 
-            IS_ENABLED(CONFIG_CMA_REUSE)) {
+            IS_ENABLED(CONFIG_C_REUSE) )  {
 		page = rmqueue_pcplist(preferred_zone, zone, order,
 				       migratetype, alloc_flags);
 		if (likely(page))
