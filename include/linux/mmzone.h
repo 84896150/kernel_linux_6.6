@@ -48,7 +48,7 @@ enum migratetype {
 	MIGRATE_RECLAIMABLE,
 	MIGRATE_PCPTYPES,	/* the number of types on the pcp lists */
 #ifdef CONFIG_CMA_REUSE
-	MIGRATE_CMA,
+    MIGRATE_CMA,
 #endif
 	MIGRATE_HIGHATOMIC = MIGRATE_PCPTYPES,
 #if defined(CONFIG_CMA) && !defined(CONFIG_CMA_REUSE)

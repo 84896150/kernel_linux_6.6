@@ -2085,21 +2085,21 @@ static __always_inline struct page *
 __rmqueue_with_cma_reuse(struct zone *zone, unsigned int order,
 					int migratetype, unsigned int alloc_flags)
 {
-	struct page *page = NULL;
+    struct page *page = NULL;
 retry:
 	page = __rmqueue_smallest(zone, order, migratetype);
 
-	if (unlikely(!page) && is_migrate_cma(migratetype)) {
+    if (unlikely(!page) && is_migrate_cma(migratetype)) {
 		migratetype = MIGRATE_MOVABLE;
-		alloc_flags &= ~ALLOC_CMA;
-		page = __rmqueue_smallest(zone, order, migratetype);
+        alloc_flags &= ~ALLOC_CMA;
+        page = __rmqueue_smallest(zone, order, migratetype);
 	}
 
-	if (unlikely(!page) &&
+    if (unlikely(!page) &&
 		__rmqueue_fallback(zone, order, migratetype, alloc_flags))
-		goto retry;
+        goto retry;
 
-	return page;
+    return page;
 }
 
 /*
@@ -2113,8 +2113,8 @@ __rmqueue(struct zone *zone, unsigned int order, int migratetype,
 	struct page *page;
 
 #ifdef CONFIG_CMA_REUSE
-	page = __rmqueue_with_cma_reuse(zone, order, migratetype, alloc_flags);
-	goto out;
+    page = __rmqueue_with_cma_reuse(zone, order, migratetype, alloc_flags);
+    goto out;
 #endif
 
 	if (IS_ENABLED(CONFIG_CMA)) {
@@ -2141,10 +2141,9 @@ retry:
 								alloc_flags))
 			goto retry;
 	}
-	/*return page;*/
 out:
 	if (page)
-		trace_mm_page_alloc_zone_locked(page, order, migratetype, migratetype == MIGRATE_MOVABLE);
+        trace_mm_page_alloc_zone_locked(page, order, migratetype, migratetype == MIGRATE_MOVABLE);
 	return page;
 }
 
@@ -2806,8 +2805,9 @@ struct page *rmqueue(struct zone *preferred_zone,
 	 */
 	WARN_ON_ONCE((gfp_flags & __GFP_NOFAIL) && (order > 1));
 
-	/*if (likely(pcp_allowed_order(order)))*/
-	if (!IS_ENABLED(CONFIG_CMA) || alloc_flags & ALLOC_CMA ||migratetype != MIGRATE_MOVABLE ||IS_ENABLED(CONFIG_CMA_REUSE)) {
+        if ((!IS_ENABLED(CONFIG_CMA) || (alloc_flags & ALLOC_CMA)) || 
+            (migratetype != M_MOVABLE) || 
+            IS_ENABLED(CONFIG_CMA_REUSE)) {
 		page = rmqueue_pcplist(preferred_zone, zone, order,
 				       migratetype, alloc_flags);
 		if (likely(page))
@@ -3069,7 +3069,6 @@ static inline unsigned int gfp_to_alloc_flags_cma(gfp_t gfp_mask,
 {
 #ifdef CONFIG_CMA
 	unsigned int pflags = current->flags;
-	/*if (gfp_migratetype(gfp_mask) == MIGRATE_MOVABLE)*/
 	if (!(pflags & PF_MEMALLOC_PIN) && gfp_migratetype(gfp_mask) == get_cma_migratetype())
 		alloc_flags |= ALLOC_CMA;
 #endif
