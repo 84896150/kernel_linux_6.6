@@ -2805,9 +2805,9 @@ struct page *rmqueue(struct zone *preferred_zone,
 	 */
 	WARN_ON_ONCE((gfp_flags & __GFP_NOFAIL) && (order > 1));
 
-    if ( (!IS_ENABLED(CONFIG_CMA) || (alloc_flags & ALLOC_CMA)) || 
-        (migratetype != M_MOVABLE) || 
-        IS_ENABLED(CONFIG_C_REUSE) )  {
+    if ((!IS_ENABLED(CONFIG_CMA) || (alloc_flags & ALLOC_CMA)) || 
+        (migratetype != M_MOVABLE) ||
+        IS_ENABLED(CONFIG_C_REUSE)) {
 		    page = rmqueue_pcplist(preferred_zone, zone, order,
 				    migratetype, alloc_flags);
 		if (likely(page))
