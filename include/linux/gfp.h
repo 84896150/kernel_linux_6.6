@@ -28,7 +28,7 @@ static inline int gfp_migratetype(const gfp_t gfp_flags)
 		return MIGRATE_UNMOVABLE;
 
 	/* Group based on mobility */
-    ret_mt = (gfp_flags & GFP_MOVABLE_MASK) >> GFP_MOVABLE_SHIFT;
+    ret_mt = (__force unsigned long)(gfp_flags & GFP_MOVABLE_MASK) >> GFP_MOVABLE_SHIFT;
 
 #ifdef CONFIG_CMA_REUSE
 	if (ret_mt == MIGRATE_MOVABLE && (gfp_flags & __GFP_CMA))
