@@ -3066,8 +3066,7 @@ static inline unsigned int gfp_to_alloc_flags_cma(gfp_t gfp_mask,
 						  unsigned int alloc_flags)
 {
 #ifdef CONFIG_CMA
-	unsigned int pflags = current->flags;
-	if (!(pflags & PF_MEMALLOC_PIN) && gfp_migratetype(gfp_mask) == get_cma_migratetype())
+	if (gfp_migratetype(gfp_mask) == get_cma_migratetype())
 		alloc_flags |= ALLOC_CMA;
 #endif
 	return alloc_flags;
