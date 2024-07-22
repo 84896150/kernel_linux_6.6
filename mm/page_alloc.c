@@ -2142,7 +2142,7 @@ retry:
 			goto retry;
 	}
 out:
-	if (page)
+    if (page)
         trace_mm_page_alloc_zone_locked(page, order, migratetype, migratetype == MIGRATE_MOVABLE);
 	return page;
 }
