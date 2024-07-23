@@ -41,7 +41,7 @@ static int epfs_tmpfile(struct inode *dir, struct dentry *dentry, umode_t mode)
 	d_tmpfile(file, inode);
 	if (IS_ENABLED(CONFIG_EPFS_DEBUG))
 		epfs_debug("epfs: tmpfile %p", inode);
-	return 0;
+	return finish_open_simple(file, 0);;
 }
 
 const struct inode_operations epfs_dir_iops = {
