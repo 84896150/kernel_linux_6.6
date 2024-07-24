@@ -2113,8 +2113,8 @@ __rmqueue(struct zone *zone, unsigned int order, int migratetype,
 	struct page *page;
 
 #ifdef CONFIG_CMA_REUSE
-    page = __rmqueue_with_cma_reuse(zone, order, migratetype, alloc_flags);
-    if (page)
+	page = __rmqueue_with_cma_reuse(zone, order, migratetype, alloc_flags);
+	if (page)
 		return page;
 #endif
 
