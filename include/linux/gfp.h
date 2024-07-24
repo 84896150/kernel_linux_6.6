@@ -15,18 +15,24 @@ struct vm_area_struct;
 
 static inline int gfp_migratetype(const gfp_t gfp_flags)
 {
+	unsigned int ret_mt = 0;
+
 	VM_WARN_ON((gfp_flags & GFP_MOVABLE_MASK) == GFP_MOVABLE_MASK);
 	BUILD_BUG_ON((1UL << GFP_MOVABLE_SHIFT) != ___GFP_MOVABLE);
 	BUILD_BUG_ON((___GFP_MOVABLE >> GFP_MOVABLE_SHIFT) != MIGRATE_MOVABLE);
-	BUILD_BUG_ON((___GFP_RECLAIMABLE >> GFP_MOVABLE_SHIFT) != MIGRATE_RECLAIMABLE);
-	BUILD_BUG_ON(((___GFP_MOVABLE | ___GFP_RECLAIMABLE) >>
-		      GFP_MOVABLE_SHIFT) != MIGRATE_HIGHATOMIC);
 
 	if (unlikely(page_group_by_mobility_disabled))
 		return MIGRATE_UNMOVABLE;
 
 	/* Group based on mobility */
-	return (__force unsigned long)(gfp_flags & GFP_MOVABLE_MASK) >> GFP_MOVABLE_SHIFT;
+	ret_mt = (__force unsigned long)(gfp_flags & GFP_MOVABLE_MASK) >> GFP_MOVABLE_SHIFT;
+
+#ifdef CONFIG_CMA_REUSE
+	if (ret_mt == MIGRATE_MOVABLE && (gfp_flags & __GFP_CMA))
+		return MIGRATE_CMA;
+#endif
+
+	return ret_mt;
 }
 #undef GFP_MOVABLE_MASK
 #undef GFP_MOVABLE_SHIFT
