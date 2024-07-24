@@ -2142,12 +2142,6 @@ retry:
 								alloc_flags))
 			goto retry;
 	}
-<<<<<<< HEAD
-=======
-out:
-    if (page)
-        trace_mm_page_alloc_zone_locked(page, order, migratetype, migratetype == MIGRATE_MOVABLE);
->>>>>>> 1b33327ae5189711d14a883879d11bf93cdc8b6a
 	return page;
 }
 
