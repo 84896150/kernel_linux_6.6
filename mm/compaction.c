@@ -2233,7 +2233,6 @@ static enum compact_result __compact_finished(struct compact_control *cc)
 		if (!free_area_empty(area, migratetype))
 			return COMPACT_SUCCESS;
 
-
 #ifdef CONFIG_CMA
 		/* MIGRATE_MOVABLE can fallback on MIGRATE_CMA */
 		if (migratetype == get_cma_migratetype() &&
