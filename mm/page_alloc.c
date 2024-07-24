@@ -51,6 +51,10 @@
 #include <linux/lockdep.h>
 #include <linux/psi.h>
 #include <linux/khugepaged.h>
+#include <linux/zswapd.h>
+#ifdef CONFIG_RECLAIM_ACCT
+#include <linux/reclaim_acct.h>
+#endif
 #include <linux/delayacct.h>
 #include <asm/div64.h>
 #include "internal.h"
@@ -4195,6 +4199,11 @@ static inline bool prepare_alloc_pages(gfp_t gfp_mask, unsigned int order,
 	}
 
 	might_alloc(gfp_mask);
+
+#ifdef CONFIG_HYPERHOLD_ZSWAPD
+	if (gfp_mask & __GFP_KSWAPD_RECLAIM)
+		wake_all_zswapd();
+#endif
 
 	if (should_fail_alloc_page(gfp_mask, order))
 		return false;
