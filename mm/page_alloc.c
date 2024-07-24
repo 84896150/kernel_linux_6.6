@@ -2114,7 +2114,8 @@ __rmqueue(struct zone *zone, unsigned int order, int migratetype,
 
 #ifdef CONFIG_CMA_REUSE
     page = __rmqueue_with_cma_reuse(zone, order, migratetype, alloc_flags);
-    goto out;
+    if (page)
+		return page;
 #endif
 
 	if (IS_ENABLED(CONFIG_CMA)) {
@@ -2141,9 +2142,6 @@ retry:
 								alloc_flags))
 			goto retry;
 	}
-out:
-	if (page)
-        trace_mm_page_alloc_zone_locked(page, order, migratetype, migratetype == MIGRATE_MOVABLE);
 	return page;
 }
 
@@ -3060,6 +3058,7 @@ alloc_flags_nofragment(struct zone *zone, gfp_t gfp_mask)
 #endif /* CONFIG_ZONE_DMA32 */
 	return alloc_flags;
 }
+
 
 /* Must be called after current_gfp_context() which can change gfp_mask */
 static inline unsigned int gfp_to_alloc_flags_cma(gfp_t gfp_mask,
