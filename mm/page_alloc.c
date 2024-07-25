@@ -275,11 +275,8 @@ const char * const migratetype_names[MIGRATE_TYPES] = {
 	"Unmovable",
 	"Movable",
 	"Reclaimable",
-#ifdef CONFIG_CMA_REUSE
-	"CMA",
-#endif
 	"HighAtomic",
-#if defined(CONFIG_CMA) && !defined(CONFIG_CMA_REUSE)
+#ifdef CONFIG_CMA
 	"CMA",
 #endif
 #ifdef CONFIG_MEMORY_ISOLATION
@@ -2081,27 +2078,6 @@ do_steal:
 
 }
 
-static __always_inline struct page *
-__rmqueue_with_cma_reuse(struct zone *zone, unsigned int order,
-					int migratetype, unsigned int alloc_flags)
-{
-    struct page *page = NULL;
-retry:
-	page = __rmqueue_smallest(zone, order, migratetype);
-
-    if (unlikely(!page) && is_migrate_cma(migratetype)) {
-        migratetype = MIGRATE_MOVABLE;
-        alloc_flags &= ~ALLOC_CMA;
-        page = __rmqueue_smallest(zone, order, migratetype);
-    }
-
-    if (unlikely(!page) &&
-		__rmqueue_fallback(zone, order, migratetype, alloc_flags))
-        goto retry;
-
-    return page;
-}
-
 /*
  * Do the hard work of removing an element from the buddy allocator.
  * Call me with the zone->lock already held.
@@ -2111,12 +2087,6 @@ __rmqueue(struct zone *zone, unsigned int order, int migratetype,
 						unsigned int alloc_flags)
 {
 	struct page *page;
-
-#ifdef CONFIG_CMA_REUSE
-	page = __rmqueue_with_cma_reuse(zone, order, migratetype, alloc_flags);
-	if (page)
-		return page;
-#endif
 
 	if (IS_ENABLED(CONFIG_CMA)) {
 		/*
@@ -3064,7 +3034,7 @@ static inline unsigned int gfp_to_alloc_flags_cma(gfp_t gfp_mask,
 						  unsigned int alloc_flags)
 {
 #ifdef CONFIG_CMA
-	if (gfp_migratetype(gfp_mask) == get_cma_migratetype())
+	if (gfp_migratetype(gfp_mask) == MIGRATE_MOVABLE)
 		alloc_flags |= ALLOC_CMA;
 #endif
 	return alloc_flags;
