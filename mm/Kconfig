@@ -35,6 +35,16 @@ config ZSWAP
 	  in the case where decompressing from RAM is faster than swap device
 	  reads, can also improve workload performance.
 
+config CMA_REUSE
+	bool "CMA reuse feature"
+	depends on CMA
+	help
+	  If enabled, it will add MIGRATE_CMA to pcp lists and movable
+	  allocations with __GFP_CMA flag will use cma areas prior to
+	  movable areas.
+
+	  It improves the utilization ratio of cma areas.
+
 config ZSWAP_DEFAULT_ON
 	bool "Enable the compressed cache for swap pages by default"
 	depends on ZSWAP
