@@ -204,3 +204,4 @@ obj-$(CONFIG_CDX_BUS)		+= cdx/
 obj-$(CONFIG_S390)		+= s390/
 
 obj-$(CONFIG_ACCESS_TOKENID)	+= accesstokenid/
+obj-$(CONFIG_HCK_VENDOR_HOOKS)	+= hck/
