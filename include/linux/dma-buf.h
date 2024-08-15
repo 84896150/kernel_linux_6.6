@@ -370,6 +370,11 @@ struct dma_buf {
 	/** @list_node: node for dma_buf accounting and debugging. */
 	struct list_head list_node;
 
+#ifdef CONFIG_DMABUF_PROCESS_INFO
+	pid_t exp_pid;
+	char exp_task_comm[TASK_COMM_LEN];
+#endif
+
 	/** @priv: exporter specific private data for this buffer object. */
 	void *priv;
 
@@ -631,4 +636,17 @@ int dma_buf_vmap(struct dma_buf *dmabuf, struct iosys_map *map);
 void dma_buf_vunmap(struct dma_buf *dmabuf, struct iosys_map *map);
 int dma_buf_vmap_unlocked(struct dma_buf *dmabuf, struct iosys_map *map);
 void dma_buf_vunmap_unlocked(struct dma_buf *dmabuf, struct iosys_map *map);
+
+#ifdef CONFIG_DMABUF_PROCESS_INFO
+/**
+ * get_dma_buf_from_file - Get struct dma_buf* from struct file*
+ * @f:	[in]	pointer to struct file, which is associated with a
+ *		dma_buf object.
+ *
+ * If @f IS_ERR_OR_NULL, return NULL.
+ * If @f is not a file associated with dma_buf, return NULL.
+ */
+struct dma_buf *get_dma_buf_from_file(struct file *f);
+#endif /* CONFIG_DMABUF_PROCESS_INFO */
+
 #endif /* __DMA_BUF_H__ */
