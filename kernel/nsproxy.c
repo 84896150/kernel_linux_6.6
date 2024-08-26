@@ -26,6 +26,7 @@
 #include <linux/syscalls.h>
 #include <linux/cgroup.h>
 #include <linux/perf_event.h>
+#include <linux/hck/lite_hck_ced.h>
 
 static struct kmem_cache *nsproxy_cachep;
 
@@ -240,6 +241,11 @@ void switch_task_namespaces(struct task_struct *p, struct nsproxy *new)
 {
 	struct nsproxy *ns;
 
+	int ret = 0;
+	CALL_HCK_LITE_HOOK(ced_switch_task_namespaces_lhck, new);
+	CALL_HCK_LITE_HOOK(ced_switch_task_namespaces_permission_lhck, new, &ret);
+	if (ret)
+		return;
 	might_sleep();
 
 	task_lock(p);
