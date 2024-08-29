@@ -159,8 +159,12 @@ static void sugov_get_util(struct sugov_cpu *sg_cpu)
 	struct rq *rq = cpu_rq(sg_cpu->cpu);
 
 	sg_cpu->bw_dl = cpu_bw_dl(rq);
+#ifdef CONFIG_SCHED_WALT
+	cpu_util_freq_walt(sg_cpu->cpu);
+#else
 	sg_cpu->util = effective_cpu_util(sg_cpu->cpu, util,
 					  FREQUENCY_UTIL, NULL);
+#endif
 }
 
 /**
@@ -448,7 +452,12 @@ sugov_update_shared(struct update_util_data *hook, u64 time, unsigned int flags)
 
 	ignore_dl_rate_limit(sg_cpu);
 
+#ifdef CONFIG_SCHED_WALT
+	if ((sugov_should_update_freq(sg_policy, time))
+			&& !(flags & SCHED_CPUFREQ_CONTINUE)) {
+#else
 	if (sugov_should_update_freq(sg_policy, time)) {
+#endif
 		next_f = sugov_next_freq_shared(sg_cpu, time);
 
 		if (!sugov_update_next_freq(sg_policy, time, next_f))
