@@ -32,6 +32,7 @@
 #include <uapi/linux/magic.h>
 
 #include "dma-buf-sysfs-stats.h"
+#include "dma-buf-process-info.h"
 
 static inline int is_dma_buf_file(struct file *);
 
@@ -1689,6 +1690,7 @@ static int dma_buf_init_debugfs(void)
 		err = PTR_ERR(d);
 	}
 
+	dma_buf_process_info_init_debugfs(dma_buf_debugfs_dir);
 	return err;
 }
 
@@ -1706,6 +1708,19 @@ static inline void dma_buf_uninit_debugfs(void)
 }
 #endif
 
+#ifdef CONFIG_DMABUF_PROCESS_INFO
+struct dma_buf *get_dma_buf_from_file(struct file *f)
+{
+	if (IS_ERR_OR_NULL(f))
+		return NULL;
+
+	if (!is_dma_buf_file(f))
+		return NULL;
+
+	return f->private_data;
+}
+#endif /* CONFIG_DMABUF_PROCESS_INFO */
+
 static int __init dma_buf_init(void)
 {
 	int ret;
@@ -1721,6 +1736,7 @@ static int __init dma_buf_init(void)
 	mutex_init(&db_list.lock);
 	INIT_LIST_HEAD(&db_list.head);
 	dma_buf_init_debugfs();
+	dma_buf_process_info_init_procfs();
 	return 0;
 }
 subsys_initcall(dma_buf_init);
@@ -1730,5 +1746,6 @@ static void __exit dma_buf_deinit(void)
 	dma_buf_uninit_debugfs();
 	kern_unmount(dma_buf_mnt);
 	dma_buf_uninit_sysfs_statistics();
+	dma_buf_process_info_uninit_procfs();
 }
 __exitcall(dma_buf_deinit);
