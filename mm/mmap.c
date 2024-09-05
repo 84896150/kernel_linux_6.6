@@ -52,6 +52,7 @@
 #include <asm/cacheflush.h>
 #include <asm/tlb.h>
 #include <asm/mmu_context.h>
+#include <linux/hck/lite_hck_jit_memory.h>
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/mmap.h>
@@ -1418,6 +1419,12 @@ unsigned long ksys_mmap_pgoff(unsigned long addr, unsigned long len,
 	}
 
 	retval = vm_mmap_pgoff(file, addr, len, prot, flags, pgoff);
+
+	if (!IS_ERR_VALUE(retval)) {
+		CALL_HCK_LITE_HOOK(check_jit_memory_lhck, current, fd, prot, flags, PAGE_ALIGN(len), &retval);
+		if (IS_ERR_VALUE(retval))
+			pr_info("JITINFO: jit request denied");
+	}
 out_fput:
 	if (file)
 		fput(file);
@@ -2628,6 +2635,11 @@ int do_vmi_munmap(struct vma_iterator *vmi, struct mm_struct *mm,
 	end = start + PAGE_ALIGN(len);
 	if (end == start)
 		return -EINVAL;
+
+	int errno = 0;
+	CALL_HCK_LITE_HOOK(delete_jit_memory_lhck, current, start, len, &errno);
+	if (errno)
+		return errno;
 
 	 /* arch_unmap() might do unmaps itself.  */
 	arch_unmap(mm, start, end);

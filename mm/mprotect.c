@@ -38,6 +38,7 @@
 #include <asm/tlb.h>
 
 #include "internal.h"
+#include <linux/hck/lite_hck_jit_memory.h>
 
 bool can_change_pte_writable(struct vm_area_struct *vma, unsigned long addr,
 			     pte_t pte)
@@ -700,6 +701,14 @@ static int do_mprotect_pkey(unsigned long start, size_t len,
 	struct vma_iterator vmi;
 
 	start = untagged_addr(start);
+
+	if (prot & PROT_EXEC) {
+		CALL_HCK_LITE_HOOK(find_jit_memory_lhck, current, start, len, &error);
+		if (error) {
+			pr_info("JITINFO: mprotect protection triggered");
+			return error;
+		}
+	}
 
 	prot &= ~(PROT_GROWSDOWN|PROT_GROWSUP);
 	if (grows == (PROT_GROWSDOWN|PROT_GROWSUP)) /* can't be both */

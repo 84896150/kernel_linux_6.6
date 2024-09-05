@@ -73,6 +73,8 @@
 #include <linux/uaccess.h>
 #include <asm/unistd.h>
 #include <asm/mmu_context.h>
+#include <linux/hck/lite_hck_jit_memory.h>
+#include <linux/hck/lite_hck_ced.h>
 
 /*
  * The default value should be high enough to not crash a system that randomly
@@ -811,6 +813,8 @@ void __noreturn do_exit(long code)
 	struct task_struct *tsk = current;
 	int group_dead;
 
+	CALL_HCK_LITE_HOOK(exit_jit_memory_lhck, current);
+
 	WARN_ON(irqs_disabled());
 
 	synchronize_group_exit(tsk, code);
@@ -891,6 +895,7 @@ void __noreturn do_exit(long code)
 
 	exit_tasks_rcu_start();
 	exit_notify(tsk, group_dead);
+	CALL_HCK_LITE_HOOK(ced_exit_lhck, tsk);
 	proc_exit_connector(tsk);
 	mpol_put_task_policy(tsk);
 #ifdef CONFIG_FUTEX
