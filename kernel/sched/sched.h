@@ -154,6 +154,10 @@ extern unsigned int sysctl_sched_child_runs_first;
 extern void calc_global_load_tick(struct rq *this_rq);
 extern long calc_load_fold_active(struct rq *this_rq, long adjust);
 
+#ifdef CONFIG_SMP
+extern void init_sched_groups_capacity(int cpu, struct sched_domain *sd);
+#endif
+
 extern void call_trace_sched_update_nr_running(struct rq *rq, int count);
 
 extern unsigned int sysctl_sched_rt_period;
@@ -1778,6 +1782,14 @@ rq_lock(struct rq *rq, struct rq_flags *rf)
 {
 	raw_spin_rq_lock(rq);
 	rq_pin_lock(rq, rf);
+}
+
+static inline void
+rq_relock(struct rq *rq, struct rq_flags *rf)
+	__acquires(rq->lock)
+{
+	raw_spin_rq_lock(rq);
+	rq_repin_lock(rq, rf);
 }
 
 static inline void
@@ -3901,4 +3913,29 @@ static inline bool hmp_capable(void)
 }
 #endif /* CONFIG_SCHED_WALT */
 
+struct sched_avg_stats {
+	int nr;
+	int nr_misfit;
+	int nr_max;
+	int nr_scaled;
+};
+#ifdef CONFIG_SCHED_RUNNING_AVG
+extern void sched_get_nr_running_avg(struct sched_avg_stats *stats);
+#else
+static inline void sched_get_nr_running_avg(struct sched_avg_stats *stats) { }
+#endif
+
+#ifdef CONFIG_CPU_ISOLATION_OPT
+extern int group_balance_cpu_not_isolated(struct sched_group *sg);
+#else
+static inline int group_balance_cpu_not_isolated(struct sched_group *sg)
+{
+	return group_balance_cpu(sg);
+}
+#endif /* CONFIG_CPU_ISOLATION_OPT */
+
+#ifdef CONFIG_HOTPLUG_CPU
+extern void migrate_tasks(struct rq *dead_rq, struct rq_flags *rf,
+					bool migrate_pinned_tasks);
+#endif
 #endif /* _KERNEL_SCHED_SCHED_H */

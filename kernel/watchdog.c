@@ -14,6 +14,7 @@
 
 #include <linux/mm.h>
 #include <linux/cpu.h>
+#include <linux/device.h>
 #include <linux/nmi.h>
 #include <linux/init.h>
 #include <linux/module.h>
@@ -537,15 +538,19 @@ static enum hrtimer_restart watchdog_timer_fn(struct hrtimer *hrtimer)
 	return HRTIMER_RESTART;
 }
 
-static void watchdog_enable(unsigned int cpu)
+void watchdog_enable(unsigned int cpu)
 {
 	struct hrtimer *hrtimer = this_cpu_ptr(&watchdog_hrtimer);
 	struct completion *done = this_cpu_ptr(&softlockup_completion);
+	unsigned int *enabled = this_cpu_ptr(&watchdog_en);
 
 	WARN_ON_ONCE(cpu != smp_processor_id());
 
 	init_completion(done);
 	complete(done);
+
+	if (*enabled)
+		return;
 
 	/*
 	 * Start the timer first to prevent the hardlockup watchdog triggering
@@ -561,11 +566,24 @@ static void watchdog_enable(unsigned int cpu)
 	/* Enable the hardlockup detector */
 	if (watchdog_enabled & WATCHDOG_HARDLOCKUP_ENABLED)
 		watchdog_hardlockup_enable(cpu);
+
+	/*
+	 * Need to ensure above operations are observed by other CPUs before
+	 * indicating that timer is enabled. This is to synchronize core
+	 * isolation and hotplug. Core isolation will wait for this flag to be
+	 * set.
+	 */
+	mb();
+	*enabled = 1;
 }
 
-static void watchdog_disable(unsigned int cpu)
+void watchdog_disable(unsigned int cpu)
 {
-	struct hrtimer *hrtimer = this_cpu_ptr(&watchdog_hrtimer);
+	struct hrtimer *hrtimer = per_cpu_ptr(&watchdog_hrtimer, cpu);
+	unsigned int *enabled = per_cpu_ptr(&watchdog_en, cpu);
+
+	if (!*enabled)
+		return;
 
 	WARN_ON_ONCE(cpu != smp_processor_id());
 
@@ -576,7 +594,18 @@ static void watchdog_disable(unsigned int cpu)
 	 */
 	watchdog_hardlockup_disable(cpu);
 	hrtimer_cancel(hrtimer);
-	wait_for_completion(this_cpu_ptr(&softlockup_completion));
+	wait_for_completion(per_cpu_ptr(&softlockup_completion, cpu));
+
+	/*
+	 * No need for barrier here since disabling the watchdog is
+	 * synchronized with hotplug lock
+	 */
+	*enabled = 0;
+}
+
+bool watchdog_configured(unsigned int cpu)
+{
+	return *per_cpu_ptr(&watchdog_en, cpu);
 }
 
 static int softlockup_stop_fn(void *data)
