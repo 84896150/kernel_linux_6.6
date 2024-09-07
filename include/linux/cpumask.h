@@ -94,6 +94,7 @@ static inline void set_nr_cpu_ids(unsigned int nr)
  *     cpu_present_mask - has bit 'cpu' set iff cpu is populated
  *     cpu_online_mask  - has bit 'cpu' set iff cpu available to scheduler
  *     cpu_active_mask  - has bit 'cpu' set iff cpu available to migration
+ *     cpu_isolated_mask- has bit 'cpu' set iff cpu isolated
  *
  *  If !CONFIG_HOTPLUG_CPU, present == possible, and active == online.
  *
@@ -132,9 +133,28 @@ extern struct cpumask __cpu_dying_mask;
 #define cpu_present_mask  ((const struct cpumask *)&__cpu_present_mask)
 #define cpu_active_mask   ((const struct cpumask *)&__cpu_active_mask)
 #define cpu_dying_mask    ((const struct cpumask *)&__cpu_dying_mask)
+#ifdef CONFIG_CPU_ISOLATION_OPT
+extern struct cpumask __cpu_isolated_mask;
+#define cpu_isolated_mask ((const struct cpumask *)&__cpu_isolated_mask)
+#endif
 
 extern atomic_t __num_online_cpus;
 
+#if defined(CONFIG_CPU_ISOLATION_OPT) && NR_CPUS > 1
+#define num_isolated_cpus()	cpumask_weight(cpu_isolated_mask)
+#define num_online_uniso_cpus()						\
+({									\
+	cpumask_t mask;							\
+									\
+	cpumask_andnot(&mask, cpu_online_mask, cpu_isolated_mask);	\
+	cpumask_weight(&mask);						\
+})
+#define cpu_isolated(cpu)	cpumask_test_cpu((cpu), cpu_isolated_mask)
+#else /* !CONFIG_CPU_ISOLATION_OPT || NR_CPUS == 1 */
+#define num_isolated_cpus()	0U
+#define num_online_uniso_cpus()	num_online_cpus()
+#define cpu_isolated(cpu)	0U
+#endif
 extern cpumask_t cpus_booted_once_mask;
 
 static __always_inline void cpu_max_bits_warn(unsigned int cpu, unsigned int bits)
@@ -614,6 +634,18 @@ static inline bool cpumask_andnot(struct cpumask *dstp,
 }
 
 /**
+ * cpumask_complement - *dstp = ~*srcp
+ * @dstp: the cpumask result
+ * @srcp: the input to invert
+ */
+static inline void cpumask_complement(struct cpumask *dstp,
+				      const struct cpumask *srcp)
+{
+	bitmap_complement(cpumask_bits(dstp), cpumask_bits(srcp),
+					      small_cpumask_bits);
+}
+
+/**
  * cpumask_equal - *src1p == *src2p
  * @src1p: the first input
  * @src2p: the second input
@@ -974,6 +1006,9 @@ extern const DECLARE_BITMAP(cpu_all_bits, NR_CPUS);
 #define for_each_possible_cpu(cpu) for_each_cpu((cpu), cpu_possible_mask)
 #define for_each_online_cpu(cpu)   for_each_cpu((cpu), cpu_online_mask)
 #define for_each_present_cpu(cpu)  for_each_cpu((cpu), cpu_present_mask)
+#ifdef CONFIG_CPU_ISOLATION_OPT
+#define for_each_isolated_cpu(cpu) for_each_cpu((cpu), cpu_isolated_mask)
+#endif
 #endif
 
 /* Wrappers for arch boot code to manipulate normally-constant masks */
@@ -1023,6 +1058,17 @@ set_cpu_dying(unsigned int cpu, bool dying)
 	else
 		cpumask_clear_cpu(cpu, &__cpu_dying_mask);
 }
+
+#ifdef CONFIG_CPU_ISOLATION_OPT
+static inline void
+set_cpu_isolated(unsigned int cpu, bool isolated)
+{
+	if (isolated)
+		cpumask_set_cpu(cpu, &__cpu_isolated_mask);
+	else
+		cpumask_clear_cpu(cpu, &__cpu_isolated_mask);
+}
+#endif
 
 /**
  * to_cpumask - convert an NR_CPUS bitmap to a struct cpumask *
