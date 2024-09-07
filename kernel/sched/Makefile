@@ -34,3 +34,4 @@ obj-y += build_policy.o
 obj-y += build_utility.o
 obj-$(CONFIG_SCHED_WALT) += walt.o
 obj-$(CONFIG_SCHED_RUNNING_AVG) += sched_avg.o
+obj-$(CONFIG_SCHED_CORE_CTRL) += core_ctl.o
