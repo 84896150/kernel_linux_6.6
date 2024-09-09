@@ -106,7 +106,7 @@ static inline void update_last_busy_time(int cpu, bool dequeue,
 	if (prev_nr_run >= BUSY_NR_RUN && per_cpu(nr, cpu) < BUSY_NR_RUN)
 		nr_run_trigger = true;
 
-	if (dequeue && (cpu_util(cpu) * BUSY_LOAD_FACTOR) >
+	if (dequeue && (cpu_util_cfs(cpu) * BUSY_LOAD_FACTOR) >
 			capacity_orig_of(cpu))
 		load_trigger = true;
 
@@ -161,7 +161,7 @@ unsigned int sched_get_cpu_util(int cpu)
 	unsigned long capacity, flags;
 	unsigned int busy;
 
-	raw_spin_lock_irqsave(&rq->lock, flags);
+	raw_spin_lock_irqsave(&rq->__lock, flags);
 
 	util = rq->cfs.avg.util_avg;
 	capacity = capacity_orig_of(cpu);
@@ -173,7 +173,7 @@ unsigned int sched_get_cpu_util(int cpu)
 				 sched_ravg_window >> SCHED_CAPACITY_SHIFT);
 	}
 #endif
-	raw_spin_unlock_irqrestore(&rq->lock, flags);
+	raw_spin_unlock_irqrestore(&rq->__lock, flags);
 
 	util = (util >= capacity) ? capacity : util;
 	busy = div64_ul((util * 100), capacity);

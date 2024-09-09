@@ -29,10 +29,25 @@ extern void __init housekeeping_init(void);
 
 #else
 
+#ifdef CONFIG_CPU_ISOLATION_OPT
+static inline int housekeeping_any_cpu(enum hk_type type)
+{
+	cpumask_t available;
+	int cpu;
+
+	cpumask_andnot(&available, cpu_online_mask, cpu_isolated_mask);
+	cpu = cpumask_any(&available);
+	if (cpu >= nr_cpu_ids)
+		cpu = smp_processor_id();
+
+	return cpu;
+}
+#else
 static inline int housekeeping_any_cpu(enum hk_type type)
 {
 	return smp_processor_id();
 }
+#endif
 
 static inline const struct cpumask *housekeeping_cpumask(enum hk_type type)
 {
@@ -61,7 +76,11 @@ static inline bool housekeeping_cpu(int cpu, enum hk_type type)
 	if (static_branch_unlikely(&housekeeping_overridden))
 		return housekeeping_test_cpu(cpu, type);
 #endif
+#ifdef CONFIG_CPU_ISOLATION_OPT
+	return !cpu_isolated(cpu);
+#else
 	return true;
+#endif
 }
 
 static inline bool cpu_is_isolated(int cpu)
