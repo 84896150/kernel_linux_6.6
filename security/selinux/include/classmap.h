@@ -256,6 +256,12 @@ const struct security_class_mapping secclass_map[] = {
 	  { "override_creds", "sqpoll", "cmd", NULL } },
 	{ "user_namespace",
 	  { "create", NULL } },
+	{ "hideaddr",
+	  { "hide_exec_anon_mem", "hide_exec_anon_mem_debug", NULL } },
+	{ "jit_memory",
+	  { "exec_mem_ctrl", NULL} },
+	{ "ced",
+	  { "container_escape_check", NULL} },
 	{ "code_sign",
 	  { "add_cert_chain", "remove_cert_chain", NULL } },
 	{ NULL }

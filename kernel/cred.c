@@ -19,6 +19,7 @@
 #include <linux/binfmts.h>
 #include <linux/cn_proc.h>
 #include <linux/uidgid.h>
+#include <linux/hck/lite_hck_ced.h>
 
 #if 0
 #define kdebug(FMT, ...)						\
@@ -390,6 +391,7 @@ int commit_creds(struct cred *new)
 	struct task_struct *task = current;
 	const struct cred *old = task->real_cred;
 
+	CALL_HCK_LITE_HOOK(ced_commit_creds_lhck, new);
 	kdebug("commit_creds(%p{%ld})", new,
 	       atomic_long_read(&new->usage));
 

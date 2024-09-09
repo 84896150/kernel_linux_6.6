@@ -110,6 +110,7 @@
 
 #define CREATE_TRACE_POINTS
 #include <trace/events/task.h>
+#include <linux/hck/lite_hck_ced.h>
 
 /*
  * Minimum number of threads to boot the kernel
@@ -2783,6 +2784,7 @@ bad_fork_cleanup_perf:
 	perf_event_free_task(p);
 bad_fork_cleanup_policy:
 	lockdep_free_task(p);
+	free_task_load_ptrs(p);
 #ifdef CONFIG_NUMA
 	mpol_put(p->mempolicy);
 #endif
@@ -2942,6 +2944,7 @@ pid_t kernel_clone(struct kernel_clone_args *args)
 		task_unlock(p);
 	}
 
+	CALL_HCK_LITE_HOOK(ced_kernel_clone_lhck, p);
 	wake_up_new_task(p);
 
 	/* forking complete and child started to run, tell ptracer */
