@@ -5832,6 +5832,11 @@ void scheduler_tick(void)
 #ifdef CONFIG_SMP
 	rq->idle_balance = idle_cpu(cpu);
 	trigger_load_balance(rq);
+
+#ifdef CONFIG_SCHED_EAS
+	if (curr->sched_class->check_for_migration)
+		curr->sched_class->check_for_migration(rq, curr);
+#endif
 #endif
 }
 
@@ -9964,14 +9969,14 @@ static void clear_eas_migration_request(int cpu)
 	if (rq->push_task) {
 		struct task_struct *push_task = NULL;
 
-		raw_spin_lock_irqsave(&rq->lock, flags);
+		raw_spin_lock_irqsave(&rq->__lock, flags);
 		if (rq->push_task) {
 			clear_reserved(rq->push_cpu);
 			push_task = rq->push_task;
 			rq->push_task = NULL;
 		}
 		rq->active_balance = 0;
-		raw_spin_unlock_irqrestore(&rq->lock, flags);
+		raw_spin_unlock_irqrestore(&rq->__lock, flags);
 		if (push_task)
 			put_task_struct(push_task);
 	}
@@ -10423,6 +10428,7 @@ int sched_cpu_starting(unsigned int cpu)
 	sched_core_cpu_starting(cpu);
 	sched_rq_cpu_starting(cpu);
 	sched_tick_start(cpu);
+	clear_eas_migration_request(cpu);
 	return 0;
 }
 
@@ -10495,6 +10501,8 @@ int sched_cpu_dying(unsigned int cpu)
 		dump_rq_tasks(rq, KERN_WARNING);
 	}
 	rq_unlock_irqrestore(rq, &rf);
+
+	clear_eas_migration_request(cpu);
 
 	calc_load_migrate(rq);
 	update_max_interval();
