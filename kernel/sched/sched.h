@@ -101,6 +101,12 @@
 struct rq;
 struct cpuidle_state;
 
+#ifdef CONFIG_SCHED_RT_CAS
+extern unsigned long uclamp_task_util(struct task_struct *p,
+					     unsigned long uclamp_min,
+					     unsigned long uclamp_max);
+#endif
+
 #ifdef CONFIG_SCHED_WALT
 extern unsigned int sched_ravg_window;
 extern unsigned int walt_cpu_util_freq_divisor;
@@ -970,6 +976,9 @@ struct root_domain {
 	 * CPUs of the rd. Protected by RCU.
 	 */
 	struct perf_domain __rcu *pd;
+#ifdef CONFIG_SCHED_RT_CAS
+	int max_cap_orig_cpu;
+#endif
 };
 
 extern void init_defrootdomain(void);
@@ -1141,7 +1150,17 @@ struct rq {
 	/* For active balancing */
 	int			active_balance;
 	int			push_cpu;
+#ifdef CONFIG_SCHED_EAS
+	struct task_struct	*push_task;
+#endif
 	struct cpu_stop_work	active_balance_work;
+
+	/* For rt active balancing */
+#ifdef CONFIG_SCHED_RT_ACTIVE_LB
+	int rt_active_balance;
+	struct task_struct *rt_push_task;
+	struct cpu_stop_work rt_active_balance_work;
+#endif
 
 	/* CPU of this runqueue: */
 	int			cpu;
@@ -2041,6 +2060,15 @@ static inline struct cpumask *group_balance_mask(struct sched_group *sg)
 	return to_cpumask(sg->sgc->cpumask);
 }
 
+/**
+ * group_first_cpu - Returns the first CPU in the cpumask of a sched_group.
+ * @group: The group whose first CPU is to be returned.
+ */
+static inline unsigned int group_first_cpu(struct sched_group *group)
+{
+	return cpumask_first(sched_group_span(group));
+}
+
 extern int group_balance_cpu(struct sched_group *sg);
 
 #ifdef CONFIG_SCHED_DEBUG
@@ -2403,7 +2431,9 @@ struct sched_class {
 	void (*fixup_walt_sched_stats)(struct rq *rq, struct task_struct *p,
 					u16 updated_demand_scaled);
 #endif
-
+#ifdef CONFIG_SCHED_EAS
+	void  (*check_for_migration)(struct rq *rq, struct task_struct *p);
+#endif
 #ifdef CONFIG_SCHED_CORE
 	int (*task_is_throttled)(struct task_struct *p, int cpu);
 #endif
@@ -3249,6 +3279,11 @@ out:
 	return clamp(util, min_util, max_util);
 }
 
+static inline bool uclamp_boosted(struct task_struct *p)
+{
+	return uclamp_eff_value(p, UCLAMP_MIN) > 0;
+}
+
 /* Is the rq being capped/throttled by uclamp_max? */
 static inline bool uclamp_rq_is_capped(struct rq *rq)
 {
@@ -3291,6 +3326,11 @@ unsigned long uclamp_rq_util_with(struct rq *rq, unsigned long util,
 				  struct task_struct *p)
 {
 	return util;
+}
+
+static inline bool uclamp_boosted(struct task_struct *p)
+{
+	return false;
 }
 
 static inline bool uclamp_rq_is_capped(struct rq *rq) { return false; }
@@ -3411,6 +3451,14 @@ static inline bool is_per_cpu_kthread(struct task_struct *p)
 
 extern void swake_up_all_locked(struct swait_queue_head *q);
 extern void __prepare_to_swait(struct swait_queue_head *q, struct swait_queue *wait);
+
+#ifdef CONFIG_SCHED_RTG
+extern bool task_fits_max(struct task_struct *p, int cpu);
+extern unsigned long capacity_spare_without(int cpu, struct task_struct *p);
+extern int update_preferred_cluster(struct related_thread_group *grp,
+			struct task_struct *p, u32 old_load, bool from_tick);
+extern struct cpumask *find_rtg_target(struct task_struct *p);
+#endif
 
 extern int try_to_wake_up(struct task_struct *tsk, unsigned int state, int wake_flags);
 
