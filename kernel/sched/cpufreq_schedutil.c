@@ -6,6 +6,8 @@
  * Author: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
  */
 
+#include "sched.h"
+#include "rtg/rtg.h"
 #define IOWAIT_BOOST_MIN	(SCHED_CAPACITY_SCALE / 8)
 
 struct sugov_tunables {
@@ -31,6 +33,10 @@ struct sugov_policy {
 	struct			mutex work_lock;
 	struct			kthread_worker worker;
 	struct task_struct	*thread;
+#ifdef CONFIG_SCHED_RTG
+	unsigned long rtg_util;
+	unsigned int rtg_freq;
+#endif
 	bool			work_in_progress;
 
 	bool			limits_changed;
@@ -340,6 +346,11 @@ static void sugov_update_single_freq(struct update_util_data *hook, u64 time,
 	unsigned int cached_freq = sg_policy->cached_raw_freq;
 	unsigned long max_cap;
 	unsigned int next_f;
+#ifdef CONFIG_SCHED_RTG
+	unsigned long irq_flag;
+
+	force_update = flags & SCHED_CPUFREQ_FORCE_UPDATE;
+#endif
 
 	max_cap = arch_scale_cpu_capacity(sg_cpu->cpu);
 
@@ -373,9 +384,17 @@ static void sugov_update_single_freq(struct update_util_data *hook, u64 time,
 	if (sg_policy->policy->fast_switch_enabled) {
 		cpufreq_driver_fast_switch(sg_policy->policy, next_f);
 	} else {
+#ifdef CONFIG_SCHED_RTG
+		raw_spin_lock_irqsave(&sg_policy->update_lock, irq_flag);
+#else
 		raw_spin_lock(&sg_policy->update_lock);
+#endif
 		sugov_deferred_update(sg_policy);
+#ifdef CONFIG_SCHED_RTG
+		raw_spin_unlock_irqrestore(&sg_policy->update_lock, irq_flag);
+#else
 		raw_spin_unlock(&sg_policy->update_lock);
+#endif
 	}
 }
 
@@ -435,6 +454,10 @@ static unsigned int sugov_next_freq_shared(struct sugov_cpu *sg_cpu, u64 time)
 		util = max(j_sg_cpu->util, util);
 	}
 
+#ifdef CONFIG_SCHED_RTG
+	sched_get_max_group_util(policy->cpus, &sg_policy->rtg_util, &sg_policy->rtg_freq);
+	util = max(sg_policy->rtg_util, util);
+#endif
 	return get_next_freq(sg_policy, util, max_cap);
 }
 
@@ -444,8 +467,16 @@ sugov_update_shared(struct update_util_data *hook, u64 time, unsigned int flags)
 	struct sugov_cpu *sg_cpu = container_of(hook, struct sugov_cpu, update_util);
 	struct sugov_policy *sg_policy = sg_cpu->sg_policy;
 	unsigned int next_f;
+#ifdef CONFIG_SCHED_RTG
+	unsigned long irq_flag;
+#endif
 
+#ifdef CONFIG_SCHED_RTG
+	force_update = flags & SCHED_CPUFREQ_FORCE_UPDATE;
+	raw_spin_lock_irqsave(&sg_policy->update_lock, irq_flag);
+#else
 	raw_spin_lock(&sg_policy->update_lock);
+#endif
 
 	sugov_iowait_boost(sg_cpu, time, flags);
 	sg_cpu->last_update = time;
@@ -469,7 +500,11 @@ sugov_update_shared(struct update_util_data *hook, u64 time, unsigned int flags)
 			sugov_deferred_update(sg_policy);
 	}
 unlock:
+#ifdef CONFIG_SCHED_RTG
+	raw_spin_unlock_irqrestore(&sg_policy->update_lock, irq_flag);
+#else
 	raw_spin_unlock(&sg_policy->update_lock);
+#endif
 }
 
 static void sugov_work(struct kthread_work *work)
