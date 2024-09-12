@@ -262,6 +262,8 @@ const struct security_class_mapping secclass_map[] = {
 	  { "exec_mem_ctrl", NULL} },
 	{ "ced",
 	  { "container_escape_check", NULL} },
+	{ "code_sign",
+	  { "add_cert_chain", "remove_cert_chain", NULL } },
 	{ NULL }
   };
 
