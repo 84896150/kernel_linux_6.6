@@ -5096,8 +5096,26 @@ static inline int task_fits_cpu(struct task_struct *p, int cpu)
 	return (util_fits_cpu(util, uclamp_min, uclamp_max, cpu) > 0);
 }
 
+#ifdef CONFIG_SCHED_RTG
+bool task_fits_max(struct task_struct *p, int cpu)
+{
+	unsigned long capacity = capacity_orig_of(cpu);
+	unsigned long max_capacity = cpu_rq(cpu)->rd->max_cpu_capacity;
+
+	if (capacity == max_capacity)
+		return true;
+
+	return task_fits_cpu(p, cpu);
+}
+#endif
+
 static inline void update_misfit_status(struct task_struct *p, struct rq *rq)
 {
+	bool task_fits = false;
+#ifdef CONFIG_SCHED_RTG
+	int cpu = cpu_of(rq);
+	struct cpumask *rtg_target = NULL;
+#endif
 	if (!sched_asym_cpucap_active())
 		return;
 
@@ -5106,7 +5124,17 @@ static inline void update_misfit_status(struct task_struct *p, struct rq *rq)
 		return;
 	}
 
-	if (task_fits_cpu(p, cpu_of(rq))) {
+#ifdef CONFIG_SCHED_RTG
+	rtg_target = find_rtg_target(p);
+	if (rtg_target)
+		task_fits = capacity_orig_of(cpu) >=
+				capacity_orig_of(cpumask_first(rtg_target));
+	else
+		task_fits = task_fits_cpu(p, cpu_of(rq));
+#else
+	task_fits = task_fits_cpu(p, cpu_of(rq));
+#endif
+	if (task_fits) {
 		rq->misfit_task_load = 0;
 		return;
 	}
@@ -7881,6 +7909,13 @@ static inline void eenv_task_busy_time(struct energy_env *eenv,
 	eenv->task_busy_time = busy_time;
 }
 
+#ifdef CONFIG_SCHED_RTG
+unsigned long capacity_spare_without(int cpu, struct task_struct *p)
+{
+	return max_t(long, capacity_of(cpu) - cpu_util_without(cpu, p), 0);
+}
+#endif
+
 /*
  * Compute the perf_domain (PD) busy time for compute_energy(). Based on the
  * utilization for each @pd_cpus, it however doesn't take into account
@@ -8228,6 +8263,12 @@ select_task_rq_fair(struct task_struct *p, int prev_cpu, int wake_flags)
 	int want_affine = 0;
 	/* SD_flags and WF_flags share the first nibble */
 	int sd_flag = wake_flags & 0xF;
+#ifdef CONFIG_SCHED_RTG
+	int target_cpu = -1;
+		target_cpu = find_rtg_cpu(p);
+		if (target_cpu >= 0)
+			return target_cpu;
+#endif
 
 	/*
 	 * required for stable ->cpus_allowed
@@ -9130,6 +9171,13 @@ int can_migrate_task(struct task_struct *p, struct lb_env *env)
 	/* Record that we found at least one task that could run on dst_cpu */
 	env->flags &= ~LBF_ALL_PINNED;
 
+
+#ifdef CONFIG_SCHED_RTG
+	if (env->flags & LBF_IGNORE_PREFERRED_CLUSTER_TASKS &&
+			 !preferred_cluster(cpu_rq(env->dst_cpu)->cluster, p))
+		return 0;
+#endif
+
 	if (task_on_cpu(env->src_rq, p)) {
 		schedstat_inc(p->stats.nr_failed_migrations_running);
 		return 0;
@@ -9224,6 +9272,9 @@ static int detach_tasks(struct lb_env *env)
 	unsigned long util, load;
 	struct task_struct *p;
 	int detached = 0;
+#ifdef CONFIG_SCHED_RTG
+	int orig_loop = env->loop;
+#endif
 
 	lockdep_assert_rq_held(env->src_rq);
 
@@ -9239,6 +9290,12 @@ static int detach_tasks(struct lb_env *env)
 	if (env->imbalance <= 0)
 		return 0;
 
+#ifdef CONFIG_SCHED_RTG
+	if (!same_cluster(env->dst_cpu, env->src_cpu))
+		env->flags |= LBF_IGNORE_PREFERRED_CLUSTER_TASKS;
+
+redo:
+#endif
 	while (!list_empty(tasks)) {
 		/*
 		 * We don't want to steal all, otherwise we may be treated likewise,
@@ -9343,6 +9400,15 @@ static int detach_tasks(struct lb_env *env)
 next:
 		list_move(&p->se.group_node, tasks);
 	}
+
+#ifdef CONFIG_SCHED_RTG
+	if (env->flags & LBF_IGNORE_PREFERRED_CLUSTER_TASKS && !detached) {
+		tasks = &env->src_rq->cfs_tasks;
+		env->flags &= ~LBF_IGNORE_PREFERRED_CLUSTER_TASKS;
+		env->loop = orig_loop;
+		goto redo;
+	}
+#endif
 
 	/*
 	 * Right now, this is one of only two places we collect this stat

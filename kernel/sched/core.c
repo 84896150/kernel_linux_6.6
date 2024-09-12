@@ -4679,6 +4679,9 @@ static void __sched_fork(unsigned long clone_flags, struct task_struct *p)
 	p->wake_entry.u_flags = CSD_TYPE_TTWU;
 	p->migration_pending = NULL;
 #endif
+#ifdef CONFIG_SCHED_RTG
+	p->rtg_depth = 0;
+#endif
 	init_sched_mm_cid(p);
 }
 
@@ -4897,7 +4900,14 @@ int sched_fork(unsigned long clone_flags, struct task_struct *p)
 	if (unlikely(p->sched_reset_on_fork)) {
 		if (task_has_dl_policy(p) || task_has_rt_policy(p)) {
 			p->policy = SCHED_NORMAL;
+#ifdef CONFIG_SCHED_RTG
+			if (current->rtg_depth != 0)
+				p->static_prio = current->static_prio;
+			else
+				p->static_prio = NICE_TO_PRIO(0);
+#else
 			p->static_prio = NICE_TO_PRIO(0);
+#endif
 			p->rt_priority = 0;
 		} else if (PRIO_TO_NICE(p->static_prio) < 0)
 			p->static_prio = NICE_TO_PRIO(0);
@@ -5820,7 +5830,9 @@ void scheduler_tick(void)
 	task_tick_mm_cid(rq, curr);
 
 	rq_unlock(rq, &rf);
-
+#ifdef CONFIG_SCHED_RTG
+	sched_update_rtg_tick(curr);
+#endif
 	if (sched_feat(LATENCY_WARN) && resched_latency)
 		resched_latency_warn(cpu, resched_latency);
 
@@ -11228,6 +11240,11 @@ cpu_cgroup_css_alloc(struct cgroup_subsys_state *parent_css)
 	if (IS_ERR(tg))
 		return ERR_PTR(-ENOMEM);
 
+#ifdef CONFIG_SCHED_RTG_CGROUP
+	tg->colocate = false;
+	tg->colocate_update_disabled = false;
+#endif
+
 	return &tg->css;
 }
 
@@ -11281,6 +11298,26 @@ static int cpu_cgroup_can_attach(struct cgroup_taskset *tset)
 	}
 	return 0;
 }
+#endif
+
+#if defined(CONFIG_UCLAMP_TASK_GROUP) && defined(CONFIG_SCHED_RTG_CGROUP)
+static void schedgp_attach(struct cgroup_taskset *tset)
+{
+	struct task_struct *task;
+	struct cgroup_subsys_state *css;
+	bool colocate;
+	struct task_group *tg;
+
+	cgroup_taskset_first(tset, &css);
+	tg = css_tg(css);
+
+	colocate = tg->colocate;
+
+	cgroup_taskset_for_each(task, css, tset)
+		sync_cgroup_colocation(task, colocate);
+}
+#else
+static void schedgp_attach(struct cgroup_taskset *tset) { }
 #endif
 
 static void cpu_cgroup_attach(struct cgroup_taskset *tset)
@@ -11467,6 +11504,30 @@ static int cpu_uclamp_max_show(struct seq_file *sf, void *v)
 	cpu_uclamp_print(sf, UCLAMP_MAX);
 	return 0;
 }
+
+#ifdef CONFIG_SCHED_RTG_CGROUP
+static u64 sched_colocate_read(struct cgroup_subsys_state *css,
+				struct cftype *cft)
+{
+	struct task_group *tg = css_tg(css);
+
+	return (u64) tg->colocate;
+}
+
+static int sched_colocate_write(struct cgroup_subsys_state *css,
+				struct cftype *cft, u64 colocate)
+{
+	struct task_group *tg = css_tg(css);
+
+	if (tg->colocate_update_disabled)
+		return -EPERM;
+
+	tg->colocate = !!colocate;
+	tg->colocate_update_disabled = true;
+
+	return 0;
+}
+#endif /* CONFIG_SCHED_RTG_CGROUP */
 #endif /* CONFIG_UCLAMP_TASK_GROUP */
 
 #ifdef CONFIG_FAIR_GROUP_SCHED
@@ -11939,6 +12000,14 @@ static struct cftype cpu_legacy_files[] = {
 		.seq_show = cpu_uclamp_max_show,
 		.write = cpu_uclamp_max_write,
 	},
+#ifdef CONFIG_SCHED_RTG_CGROUP
+	{
+		.name = "uclamp.colocate",
+		.flags = CFTYPE_NOT_ON_ROOT,
+		.read_u64 = sched_colocate_read,
+		.write_u64 = sched_colocate_write,
+	},
+#endif
 #endif
 	{ }	/* Terminate */
 };

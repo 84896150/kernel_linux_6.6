@@ -908,6 +908,12 @@ struct task_struct {
 	unsigned int			core_occupation;
 #endif
 
+#ifdef CONFIG_SCHED_RTG
+	int rtg_depth;
+	struct related_thread_group	*grp;
+	struct list_head		grp_list;
+#endif
+
 #ifdef CONFIG_CGROUP_SCHED
 	struct task_group		*sched_task_group;
 #endif
