@@ -5349,6 +5349,21 @@ int security_perf_event_write(struct perf_event *event)
 }
 #endif /* CONFIG_PERF_EVENTS */
 
+/**
+ * security_mmap_region() - Check if mmap region is allowed
+ * @vma: vm area
+ *
+ * Mmap region if allowed.
+ *
+ * Return: Returns 0 if permission is granted.
+ */
+#ifdef CONFIG_SECURITY_XPM
+int security_mmap_region(struct vm_area_struct *vma)
+{
+	return call_int_hook(mmap_region, 0, vma);
+}
+#endif
+
 #ifdef CONFIG_IO_URING
 /**
  * security_uring_override_creds() - Check if overriding creds is allowed

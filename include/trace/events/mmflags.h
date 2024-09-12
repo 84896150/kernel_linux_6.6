@@ -65,6 +65,12 @@
 	__def_gfpflag_names __def_gfpflag_names_kasan			\
 	) : "none"
 
+#ifdef CONFIG_SECURITY_XPM
+#define IF_HAVE_PG_XPM_INTEGRITY(flag,string) ,{1UL << flag, string}
+#else
+#define IF_HAVE_PG_XPM_INTEGRITY(flag,string)
+#endif
+
 #ifdef CONFIG_MMU
 #define IF_HAVE_PG_MLOCK(_name) ,{1UL << PG_##_name, __stringify(_name)}
 #else
@@ -126,6 +132,8 @@ IF_HAVE_PG_IDLE(idle)							\
 IF_HAVE_PG_IDLE(young)							\
 IF_HAVE_PG_ARCH_X(arch_2)						\
 IF_HAVE_PG_ARCH_X(arch_3)
+IF_HAVE_PG_ARCH_X(xpm_readonly)						\
+IF_HAVE_PG_ARCH_X(xpm_writetainted)
 
 #define show_page_flags(flags)						\
 	(flags) ? __print_flags(flags, "|",				\

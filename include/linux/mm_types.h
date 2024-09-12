@@ -19,6 +19,7 @@
 #include <linux/workqueue.h>
 #include <linux/seqlock.h>
 #include <linux/percpu_counter.h>
+#include <linux/xpm_types.h>
 
 #include <asm/mmu.h>
 
@@ -917,6 +918,14 @@ struct mm_struct {
 #endif
 		} lru_gen;
 #endif /* CONFIG_LRU_GEN */
+
+#ifdef CONFIG_SECURITY_XPM
+		struct xpm_region xpm_region;
+#endif
+
+#ifdef CONFIG_SECURITY_CODE_SIGN
+		struct cs_info pcs_info;
+#endif
 	} __randomize_layout;
 
 	/*
