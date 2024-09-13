@@ -326,6 +326,10 @@ void lruvec_add_folio(struct lruvec *lruvec, struct folio *folio)
 			folio_nr_pages(folio));
 	if (lru != LRU_UNEVICTABLE)
 		list_add(&folio->lru, &lruvec->lists[lru]);
+
+	if (lru == LRU_UNEVICTABLE)
+		pr_info("pid:%d,comm:%s add to UNEVICTABLE\n",
+				current->pid, current->comm);
 }
 
 static __always_inline
@@ -354,6 +358,10 @@ void lruvec_del_folio(struct lruvec *lruvec, struct folio *folio)
 		list_del(&folio->lru);
 	update_lru_size(lruvec, lru, folio_zonenum(folio),
 			-folio_nr_pages(folio));
+	
+	if (lru == LRU_UNEVICTABLE)
+		pr_info("pid:%d,comm:%s remove from UNEVICTABLE\n",
+				current->pid, current->comm);
 }
 
 #ifdef CONFIG_ANON_VMA_NAME
