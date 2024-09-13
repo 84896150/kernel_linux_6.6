@@ -2111,6 +2111,15 @@ static inline int security_perf_event_write(struct perf_event *event)
 #endif /* CONFIG_SECURITY */
 #endif /* CONFIG_PERF_EVENTS */
 
+#if IS_ENABLED(CONFIG_SECURITY) && IS_ENABLED(CONFIG_SECURITY_XPM)
+extern int security_mmap_region(struct vm_area_struct *vma);
+#else
+static inline int security_mmap_region(struct vm_area_struct *vma)
+{
+	return 0;
+}
+#endif /* CONFIG_SECURITY && CONFIG_SECURITY_XPM */
+
 #ifdef CONFIG_IO_URING
 #ifdef CONFIG_SECURITY
 extern int security_uring_override_creds(const struct cred *new);
