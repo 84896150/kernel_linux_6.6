@@ -131,7 +131,7 @@ IF_HAVE_PG_HWPOISON(hwpoison)						\
 IF_HAVE_PG_IDLE(idle)							\
 IF_HAVE_PG_IDLE(young)							\
 IF_HAVE_PG_ARCH_X(arch_2)						\
-IF_HAVE_PG_ARCH_X(arch_3)
+IF_HAVE_PG_ARCH_X(arch_3)						\
 IF_HAVE_PG_ARCH_X(xpm_readonly)						\
 IF_HAVE_PG_ARCH_X(xpm_writetainted)
 
