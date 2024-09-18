@@ -23,6 +23,7 @@
 #include <linux/uio.h>
 #include <linux/list.h>
 #include <linux/wait.h>
+#include <linux/version.h>
 
 static struct class *hievent_class;
 static dev_t hievent_devno;
@@ -252,6 +253,9 @@ out:
 
 	return retval;
 }
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+EXPORT_SYMBOL(hievent_write_internal);
+#endif
 
 static unsigned int hievent_poll(struct file *filep, poll_table *wait)
 {
