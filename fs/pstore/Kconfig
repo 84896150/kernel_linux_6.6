@@ -13,6 +13,16 @@ config PSTORE
 	   If you don't have a platform persistent store driver,
 	   say N.
 
+config PSTORE_DEFLATE_COMPRESS
+	tristate "DEFLATE (ZLIB) compression"
+	default y
+	depends on PSTORE
+	select CRYPTO_DEFLATE
+	help
+	  This option enables DEFLATE (also known as ZLIB) compression
+	  algorithm support.
+
+
 config PSTORE_DEFAULT_KMSG_BYTES
 	int "Default kernel log storage space" if EXPERT
 	depends on PSTORE
@@ -33,6 +43,26 @@ config PSTORE_COMPRESS
 	  algorithm, using the library implementation instead of using the full
 	  blown crypto API. This reduces the risk of secondary oopses or other
 	  problems while pstore is recording panic metadata.
+
+choice
+	prompt "Default pstore compression algorithm"
+	depends on PSTORE_COMPRESS
+	help
+	  This option chooses the default active compression algorithm.
+	  This change be changed at boot with "pstore.compress=..." on
+	  the kernel command line.
+
+	  Currently, pstore has support for 6 compression algorithms:
+	  deflate, lzo, lz4, lz4hc, 842 and zstd.
+
+	  The default compression algorithm is deflate.
+	config PSTORE_DEFLATE_COMPRESS_DEFAULT
+		bool "deflate" if PSTORE_DEFLATE_COMPRESS
+endchoice
+config PSTORE_COMPRESS_DEFAULT
+	string
+	depends on PSTORE_COMPRESS
+	default "deflate" if PSTORE_DEFLATE_COMPRESS_DEFAULT
 
 config PSTORE_CONSOLE
 	bool "Log kernel console messages"
@@ -62,6 +92,18 @@ config PSTORE_FTRACE
 	  ram buffer that can be decoded and dumped after reboot through
 	  pstore filesystem. It can be used to determine what function
 	  was last called before a reset or panic.
+
+	  If unsure, say N.
+
+config PSTORE_BLACKBOX
+	bool "Store customised fault log"
+	depends on PSTORE
+	depends on BLACKBOX
+	help
+	  Enable storing the customised fault log for BlackBox.
+
+	  With the option enabled, pstore will store the customised kernel
+	  fault log for BlackBox when oops or panic happened.
 
 	  If unsure, say N.
 
@@ -189,3 +231,24 @@ config PSTORE_BLK_FTRACE_SIZE
 
 	  NOTE that, both Kconfig and module parameters can configure
 	  pstore/blk, but module parameters have priority over Kconfig.
+
+config PSTORE_BLK_BLACKBOX_SIZE
+	int "Size in Kbytes of fault log for BlackBox to store"
+	depends on PSTORE_BLK
+	depends on PSTORE_BLACKBOX
+	default 64
+	help
+	  This just sets size of fault log (blackbox_size) for pstore/blk.
+	  The size is in KB and must be a multiple of 4.
+
+	  NOTE that, both Kconfig and module parameters can configure
+	  pstore/blk, but module parameters have priority over Kconfig.
+
+config PSTORE_BLACKBOX_STACK_SIZE
+	int "Default stack size for BlackBox" if EXPERT
+	depends on PSTORE
+	depends on PSTORE_BLACKBOX
+	default 1024
+	help
+	  Defines default size of pstore stack size for blackbox.
+	  Can be enlarged if needed. not recommended to shrink it.
