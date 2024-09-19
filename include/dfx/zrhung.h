@@ -6,6 +6,12 @@
 #ifndef ZRHUNG_H
 #define ZRHUNG_H
 
+#include <linux/version.h>
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+int zrhung_send_event_bbox_time(const char *domain, const char *event_name, const char *msg_buf);
+int zrhung_send_event_bbox_sysreset(const char *domain, const char *event_name, const char *msg_buf);
+#endif
+
 int zrhung_send_event(const char *domain, const char *event_name, const char *msg_buf);
 
 #endif /* ZRHUNG_H */
