@@ -93,10 +93,6 @@ static __always_inline enum lru_list folio_lru_list(struct folio *folio)
 		return LRU_UNEVICTABLE;
 
 	lru = folio_is_file_lru(folio) ? LRU_INACTIVE_FILE : LRU_INACTIVE_ANON;
-#ifdef CONFIG_MEM_PURGEABLE
-	if (folio_test_purgeable(folio))
-		lru = LRU_INACTIVE_PURGEABLE;
-#endif
 	if (folio_test_active(folio))
 		lru += LRU_ACTIVE;
 

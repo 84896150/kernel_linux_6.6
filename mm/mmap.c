@@ -1353,16 +1353,6 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 			 */
 			pgoff = addr >> PAGE_SHIFT;
 			break;
-#ifdef CONFIG_MEM_PURGEABLE
-		case MAP_PURGEABLE:
-			vm_flags |= VM_PURGEABLE;
-			pr_info("vm_flags purgeable = %lx.\n", VM_PURGEABLE);
-			break;
-		case MAP_USEREXPTE:
-			vm_flags |= VM_USEREXPTE;
-			pr_info("vm_flags useredpte = %lx.\n", VM_USEREXPTE);
-			break;
-#endif
 		default:
 			return -EINVAL;
 		}
