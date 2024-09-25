@@ -57,6 +57,7 @@
 #include <linux/khugepaged.h>
 #include <linux/rculist_nulls.h>
 #include <linux/random.h>
+#include <linux/version.h>
 
 #include <asm/tlbflush.h>
 #include <asm/div64.h>
@@ -1517,6 +1518,7 @@ void folio_putback_lru(struct folio *folio)
 enum folio_references {
 	FOLIOREF_RECLAIM,
 	FOLIOREF_RECLAIM_CLEAN,
+	FOLIOREF_RECLAIM_PURGEABLE,
 	FOLIOREF_KEEP,
 	FOLIOREF_ACTIVATE,
 };
@@ -1537,6 +1539,11 @@ static enum folio_references folio_check_references(struct folio *folio,
 	 */
 	if (vm_flags & VM_LOCKED)
 		return FOLIOREF_ACTIVATE;
+
+#ifdef CONFIG_MEM_PURGEABLE
+	if (vm_flags & VM_PURGEABLE)
+		return FOLIOREF_RECLAIM_PURGEABLE;
+#endif
 
 	/* rmap lock contention: rotate */
 	if (referenced_ptes == -1)
@@ -1868,6 +1875,7 @@ retry:
 			goto keep_locked;
 		case FOLIOREF_RECLAIM:
 		case FOLIOREF_RECLAIM_CLEAN:
+		case FOLIOREF_RECLAIM_PURGEABLE:
 			; /* try to reclaim the folio below */
 		}
 
@@ -1888,7 +1896,7 @@ retry:
 		 * Lazyfree folio could be freed directly
 		 */
 		if (folio_test_anon(folio) && folio_test_swapbacked(folio)) {
-			if (!folio_test_swapcache(folio)) {
+			if (!folio_test_swapcache(folio) && references != FOLIOREF_RECLAIM_PURGEABLE) {
 				if (!(sc->gfp_mask & __GFP_IO))
 					goto keep_locked;
 				if (folio_maybe_dma_pinned(folio))
@@ -1970,7 +1978,7 @@ retry:
 			goto activate_locked;
 
 		mapping = folio_mapping(folio);
-		if (folio_test_dirty(folio)) {
+		if (folio_test_dirty(folio) && references != FOLIOREF_RECLAIM_PURGEABLE) {
 			/*
 			 * Only kswapd can writeback filesystem folios
 			 * to avoid risk of stack overflow. But avoid
@@ -2085,10 +2093,19 @@ retry:
 			}
 		}
 
-		if (folio_test_anon(folio) && !folio_test_swapbacked(folio)) {
+		if (folio_test_anon(folio) &&
+			(!folio_test_swapbacked(folio) ||
+			 references == FOLIOREF_RECLAIM_PURGEABLE)) {
 			/* follow __remove_mapping for reference */
 			if (!folio_ref_freeze(folio, 1))
 				goto keep_locked;
+// missing
+/*
+			if (folio_test_dirty(folio) && references != FOLIOREF_RECLAIM_PURGEABLE) {
+				folio__ref_unfreeze(folio, 1);
+				goto keep_locked;
+			}
+*/
 			/*
 			 * The folio has only one reference left, which is
 			 * from the isolation. After the caller puts the
@@ -7953,6 +7970,10 @@ void __meminit kswapd_stop(int nid)
 	pgdat_kswapd_unlock(pgdat);
 }
 
+#ifdef CONFIG_MEM_PURGEABLE_DEBUG
+static void __init purgeable_debugfs_init(void);
+#endif
+
 static int __init kswapd_init(void)
 {
 	int nid;
@@ -7960,6 +7981,9 @@ static int __init kswapd_init(void)
 	swap_setup();
 	for_each_node_state(nid, N_MEMORY)
  		kswapd_run(nid);
+#ifdef CONFIG_MEM_PURGEABLE_DEBUG
+	purgeable_debugfs_init();
+#endif
 	return 0;
 }
 
@@ -8181,3 +8205,68 @@ void check_move_unevictable_folios(struct folio_batch *fbatch)
 	}
 }
 EXPORT_SYMBOL_GPL(check_move_unevictable_folios);
+
+#ifdef CONFIG_MEM_PURGEABLE_DEBUG
+static unsigned long purgeable_node(pg_data_t *pgdata, struct scan_control *sc)
+{
+	struct mem_cgroup *memcg = NULL;
+	unsigned long nr = 0;
+
+#ifdef CONFIG_MEMCG
+	while (memcg = mem_cgroup_iter(NULL, memcg, NULL))
+#endif
+	{
+		struct lruvec *lruvec = mem_cgroup_lruvec(memcg, pgdata);
+
+		shrink_list(LRU_ACTIVE_PURGEABLE, -1, lruvec, sc);
+		nr += shrink_list(LRU_INACTIVE_PURGEABLE, -1, lruvec, sc);
+	}
+
+	pr_info("reclaim %lu purgeable pages.\n", nr);
+
+	return nr;
+}
+
+static int purgeable(struct ctl_table *table, int write, void *buffer,
+		size_t *lenp, loff_t *ppos)
+{
+	struct scan_control sc = {
+		.gfp_mask = GFP_KERNEL,
+		.order = 0,
+		.priority = DEF_PRIORITY,
+		.may_deactivate = DEACTIVATE_ANON,
+		.may_writepage = 1,
+		.may_unmap = 1,
+		.may_swap = 1,
+		.reclaim_idx = MAX_NR_ZONES - 1,
+	};
+	int nid = 0;
+
+	for_each_node_state(nid, N_MEMORY)
+		purgeable_node(NODE_DATA(nid), &sc);
+	return 0;
+}
+
+static struct ctl_table sys_tab[] = {
+	{
+		.procname = "purgeable",
+		.mode = 0200,
+		.proc_handler = purgeable,
+	},
+	{}
+};
+
+static struct ctl_table_header *purgeable_header;
+
+static void __init purgeable_debugfs_init(void)
+{
+	purgeable_header = register_sysctl("kernel", sys_tab);
+	if (!purgeable_header)
+		pr_err("register purgeable sysctl table failed.\n");
+}
+
+static void __exit purgeable_debugfs_exit(void)
+{
+	unregister_sysctl_table(purgeable_header);
+}
+#endif /* CONFIG_MEM_PURGEABLE_DEBUG */

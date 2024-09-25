@@ -65,6 +65,12 @@
 	__def_gfpflag_names __def_gfpflag_names_kasan			\
 	) : "none"
 
+#ifdef CONFIG_MEM_PURGEABLE
+#define IF_HAVE_PG_PURGEABLE(flag,string) ,{1UL << flag, string}
+#else
+#define IF_HAVE_PG_PURGEABLE(flag,string)
+#endif
+
 #ifdef CONFIG_SECURITY_XPM
 #define IF_HAVE_PG_XPM_INTEGRITY(flag,string) ,{1UL << flag, string}
 #else
@@ -125,6 +131,7 @@
 	DEF_PAGEFLAG_NAME(reclaim),					\
 	DEF_PAGEFLAG_NAME(swapbacked),					\
 	DEF_PAGEFLAG_NAME(unevictable)					\
+IF_HAVE_PG_PURGEABLE(PG_purgeable,	"purgeable"	)		\
 IF_HAVE_PG_MLOCK(mlocked)						\
 IF_HAVE_PG_UNCACHED(uncached)						\
 IF_HAVE_PG_HWPOISON(hwpoison)						\
