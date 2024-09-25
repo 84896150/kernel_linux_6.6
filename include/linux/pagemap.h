@@ -243,6 +243,8 @@ static inline void mapping_set_error(struct address_space *mapping, int error)
 
 static inline void mapping_set_unevictable(struct address_space *mapping)
 {
+	pr_info("%s\n",__func__);
+	dump_stack();
 	set_bit(AS_UNEVICTABLE, &mapping->flags);
 }
 
