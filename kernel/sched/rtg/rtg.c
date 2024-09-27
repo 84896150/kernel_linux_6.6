@@ -6,6 +6,7 @@
 #include <linux/sched.h>
 #include <linux/cpumask.h>
 #include <trace/events/walt.h>
+#include <linux/sched/rtg.h>
 #define CREATE_TRACE_POINTS
 #include <trace/events/rtg.h>
 #undef CREATE_TRACE_POINTS
@@ -722,7 +723,7 @@ int find_rtg_cpu(struct task_struct *p)
 		if (is_reserved(i))
 			continue;
 
-		if (idle_cpu(i) || (i == task_cpu(p) && p->state == TASK_RUNNING)) {
+		if (idle_cpu(i) || (i == task_cpu(p) && p->__state == TASK_RUNNING)) {
 			trace_find_rtg_cpu(p, preferred_cpus, "prefer_idle", i);
 			return i;
 		}
@@ -738,7 +739,7 @@ int find_rtg_cpu(struct task_struct *p)
 			continue;
 
 		/* take the Active LB CPU as idle_backup_cpu */
-		if (idle_cpu(i) || (i == task_cpu(p) && p->state == TASK_RUNNING)) {
+		if (idle_cpu(i) || (i == task_cpu(p) && p->__state == TASK_RUNNING)) {
 			/* find the idle_backup_cpu with max capacity */
 			if (idle_backup_cpu == -1 ||
 				capacity_orig_of(i) > capacity_orig_of(idle_backup_cpu))
@@ -813,7 +814,7 @@ static inline bool valid_normalized_util(struct related_thread_group *grp)
 	if (grp->nr_running != 0) {
 		list_for_each_entry(p, &grp->tasks, grp_list) {
 			get_task_struct(p);
-			if (p->state == TASK_RUNNING)
+			if (p->__state == TASK_RUNNING)
 				cpumask_set_cpu(task_cpu(p), &rtg_cpus);
 			trace_sched_rtg_task_each(grp->id, grp->nr_running, p);
 			put_task_struct(p);
@@ -1081,6 +1082,10 @@ static int __init create_default_coloc_group(void)
 	unsigned long flags;
 
 	grp = lookup_related_thread_group(DEFAULT_CGROUP_COLOC_ID);
+	if (!grp) {
+		pr_err("create_default_coloc_group fail\n");
+		return -ENODEV;
+	}
 	write_lock_irqsave(&related_thread_group_lock, flags);
 	list_add(&grp->list, &active_related_thread_groups);
 	write_unlock_irqrestore(&related_thread_group_lock, flags);
@@ -1135,7 +1140,7 @@ static void print_rtg_info(struct seq_file *file,
 static char rtg_task_state_to_char(const struct task_struct *tsk)
 {
 	static const char state_char[] = "RSDTtXZPI";
-	unsigned int tsk_state = READ_ONCE(tsk->state);
+	unsigned int tsk_state = READ_ONCE(tsk->__state);
 	unsigned int state = (tsk_state | tsk->exit_state) & TASK_REPORT;
 
 	BUILD_BUG_ON_NOT_POWER_OF_2(TASK_REPORT_MAX);

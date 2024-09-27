@@ -10744,6 +10744,7 @@ void __init sched_init(void)
 		zalloc_cpumask_var_node(&rq->scratch_mask, GFP_KERNEL, cpu_to_node(i));
 	}
 
+	BUG_ON(alloc_related_thread_groups());
 	set_load_weight(&init_task, false);
 
 	/*
@@ -10768,6 +10769,10 @@ void __init sched_init(void)
 	 */
 	init_idle(current, smp_processor_id());
 	init_new_task_load(current);
+
+#ifdef CONIG_QOS_CTRL
+	init_task_qos(current);
+#endif
 
 	calc_load_update = jiffies + LOAD_FREQ;
 

@@ -8,6 +8,7 @@
 #include <linux/trace_seq.h>
 #include <linux/tracepoint.h>
 #include <linux/sched/frame_rtg.h>
+#include <linux/sched/rtg.h>
 
 struct rq;
 
@@ -65,7 +66,7 @@ TRACE_EVENT(sched_rtg_task_each,
 		__entry->prio		= task->prio;
 		__assign_bitmask(allowed, cpumask_bits(&task->cpus_mask), num_possible_cpus());
 		__entry->cpu		= task_cpu(task);
-		__entry->state		= task->state;
+		__entry->state		= task->__state;
 		__entry->on_rq		= task->on_rq;
 		__entry->on_cpu		= task->on_cpu;
 	),

@@ -107,6 +107,9 @@
 #include <linux/cn_proc.h>
 #include <linux/ksm.h>
 #include <trace/events/oom.h>
+#ifdef CONFIG_SCHED_RTG
+#include <linux/sched/rtg.h>
+#endif
 #include "internal.h"
 #include "fd.h"
 

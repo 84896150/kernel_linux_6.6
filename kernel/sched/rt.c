@@ -1958,7 +1958,7 @@ static int find_cas_cpu(struct sched_domain *sd,
 			}
 
 			/* active LB or big_task favor cpus with more capacity */
-			if (task->state == TASK_RUNNING || boosted) {
+			if (task->__state == TASK_RUNNING || boosted) {
 				if (capacity_orig_of(cpu) >
 				    capacity_orig_of(cpumask_any(rtg_target))) {
 					sg_target = sg;

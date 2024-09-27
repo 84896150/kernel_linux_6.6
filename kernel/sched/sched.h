@@ -84,6 +84,10 @@
 # include <linux/static_key.h>
 #endif
 
+#ifdef CONFIG_SCHED_RTG
+#include <linux/sched/rtg.h>
+#endif
+
 #ifdef CONFIG_PARAVIRT
 # include <asm/paravirt.h>
 # include <asm/paravirt_api_clock.h>

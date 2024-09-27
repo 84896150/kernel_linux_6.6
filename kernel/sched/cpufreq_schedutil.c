@@ -347,6 +347,9 @@ static void sugov_update_single_freq(struct update_util_data *hook, u64 time,
 	unsigned long max_cap;
 	unsigned int next_f;
 #ifdef CONFIG_SCHED_RTG
+	bool force_update = false;
+#endif
+#ifdef CONFIG_SCHED_RTG
 	unsigned long irq_flag;
 
 	force_update = flags & SCHED_CPUFREQ_FORCE_UPDATE;
@@ -469,6 +472,7 @@ sugov_update_shared(struct update_util_data *hook, u64 time, unsigned int flags)
 	unsigned int next_f;
 #ifdef CONFIG_SCHED_RTG
 	unsigned long irq_flag;
+	bool force_update = false;
 #endif
 
 #ifdef CONFIG_SCHED_RTG
