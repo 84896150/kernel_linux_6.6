@@ -52,11 +52,15 @@
 #include <asm/switch_to.h>
 
 #include <linux/sched/cond_resched.h>
+#ifdef CONFIG_SCHED_RTG
+#include <linux/sched/rtg.h>
+#endif
 
 #include "sched.h"
 #include "stats.h"
 #include "autogroup.h"
 #include "walt.h"
+#include "rtg/rtg.h"
 
 #ifdef CONFIG_SCHED_WALT
 static void walt_fixup_sched_stats_fair(struct rq *rq, struct task_struct *p,
@@ -8979,7 +8983,9 @@ enum migration_type {
 #define LBF_DST_PINNED  0x04
 #define LBF_SOME_PINNED	0x08
 #define LBF_ACTIVE_LB	0x10
-
+#ifdef CONFIG_SCHED_RTG
+#define LBF_IGNORE_PREFERRED_CLUSTER_TASKS 0x200
+#endif
 struct lb_env {
 	struct sched_domain	*sd;
 

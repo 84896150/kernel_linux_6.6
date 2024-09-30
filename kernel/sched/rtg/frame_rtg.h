@@ -12,6 +12,7 @@
 #include <linux/bitmap.h>
 #include <linux/spinlock.h>
 #include <linux/sched/frame_rtg.h>
+#include <linux/sched/rtg.h>
 
 #define MULTI_FRAME_ID (DEFAULT_CGROUP_COLOC_ID + 1)
 #define MULTI_FRAME_NUM (MAX_NUM_CGROUP_COLOC_ID - DEFAULT_CGROUP_COLOC_ID - 1)
