@@ -11,6 +11,7 @@
 #include <linux/compat.h>
 #include <linux/uaccess.h>
 #include <linux/sched/rtg_ctrl.h>
+#include <linux/sched/rtg.h>
 
 #include "frame_rtg.h"
 
