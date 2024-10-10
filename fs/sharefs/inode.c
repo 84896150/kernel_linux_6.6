@@ -17,6 +17,7 @@
 static int sharefs_getattr(struct mnt_idmap *idmap, const struct path *path, struct kstat *stat, 
                           u32 request_mask, unsigned int flags)
 {
+	sharefs_info("[tl] sharefs_getattr start");
 	struct path lower_path;
 	int ret;
 
@@ -29,6 +30,7 @@ static int sharefs_getattr(struct mnt_idmap *idmap, const struct path *path, str
 	stat->dev = 0;
 	stat->rdev = 0;
 	sharefs_put_lower_path(path->dentry, &lower_path);
+	sharefs_info("[tl] sharefs_getattr end ,ret : %d", ret);
 
 	return ret;
 }
@@ -263,9 +265,11 @@ out:
 	sharefs_put_lower_path(new_dentry, &lower_new_path);
 	return err;
 }
+#endif
 
 static int sharefs_setattr(struct dentry *dentry, struct iattr *ia)
 {
+	sharefs_info("[ltl] sharefs_setattr start");
 	int err;
 	struct dentry *lower_dentry;
 	struct inode *inode;
@@ -341,9 +345,9 @@ static int sharefs_setattr(struct dentry *dentry, struct iattr *ia)
 out:
 	sharefs_put_lower_path(dentry, &lower_path);
 out_err:
+	sharefs_info("[tl] sharefs_truncate_setsize end");
 	return err;
 }
-#endif
 
 const struct inode_operations sharefs_symlink_iops = {
 	.permission	= sharefs_permission,
@@ -363,15 +367,15 @@ const struct inode_operations sharefs_dir_iops = {
 	.rename		= sharefs_rename,
 	.create		= sharefs_create,
 	.mkdir		= sharefs_mkdir,
-	.setattr	= sharefs_setattr,
 #endif
+	.setattr	= sharefs_setattr,
 };
 
 const struct inode_operations sharefs_main_iops = {
 	.permission	= sharefs_permission,
 	.getattr	= sharefs_getattr,
 	.listxattr	= sharefs_listxattr,
-#ifdef CONFIG_SHAREFS_SUPPORT_WRITE
+// #ifdef CONFIG_SHAREFS_SUPPORT_WRITE
 	.setattr        = sharefs_setattr,
-#endif
+// #endif
 };
