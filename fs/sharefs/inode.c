@@ -77,7 +77,7 @@ static int sharefs_permission(struct mnt_idmap *idmap, struct inode *inode, int 
 }
 
 #ifdef CONFIG_SHAREFS_SUPPORT_WRITE
-static int sharefs_create(struct inode *dir, struct dentry *dentry,
+static int sharefs_create(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry,
 			 umode_t mode, bool want_excl)
 {
 	int err;
@@ -96,7 +96,7 @@ static int sharefs_create(struct inode *dir, struct dentry *dentry,
 	sharefs_get_lower_path(dentry, &lower_path);
 	lower_dentry = lower_path.dentry;
 	lower_parent_dentry = lock_parent(lower_dentry);
-	err = vfs_create(d_inode(lower_parent_dentry), lower_dentry, mode,
+	err = vfs_create(&nop_mnt_idmap, d_inode(lower_parent_dentry), lower_dentry, mode,
 			 want_excl);
 	if (err)
 		goto out;
@@ -113,7 +113,7 @@ out:
 	return err;
 }
 
-static int sharefs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
+static int sharefs_mkdir(struct mnt_idmap *idmap, struct inode *dir, struct dentry *dentry, umode_t mode)
 {
 	int err;
 	struct dentry *lower_dentry;
@@ -131,7 +131,7 @@ static int sharefs_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	sharefs_get_lower_path(dentry, &lower_path);
 	lower_dentry = lower_path.dentry;
 	lower_parent_dentry = lock_parent(lower_dentry);
-	err = vfs_mkdir(d_inode(lower_parent_dentry), lower_dentry, mode);
+	err = vfs_mkdir(&nop_mnt_idmap, d_inode(lower_parent_dentry), lower_dentry, mode);
 	if (err)
 		goto out;
 
@@ -163,14 +163,14 @@ static int sharefs_unlink(struct inode *dir, struct dentry *dentry)
 	lower_dentry = lower_path.dentry;
 	dget(lower_dentry);
 	lower_dir_dentry = lock_parent(lower_dentry);
-	err = vfs_unlink(lower_dir_inode, lower_dentry, NULL);
+	err = vfs_unlink(&nop_mnt_idmap, lower_dir_inode, lower_dentry, NULL);
 	if (err)
 		goto out;
 	fsstack_copy_attr_times(dir, lower_dir_inode);
 	fsstack_copy_inode_size(dir, lower_dir_inode);
 	set_nlink(dentry->d_inode,
 		  sharefs_lower_inode(dentry->d_inode)->i_nlink);
-	dentry->d_inode->i_ctime = dir->i_ctime;
+	dentry->d_inode->__i_ctime = dir->__i_ctime;
 	d_drop(dentry);
 
 out:
@@ -190,7 +190,7 @@ static int sharefs_rmdir(struct inode *dir, struct dentry *dentry)
 	sharefs_get_lower_path(dentry, &lower_path);
 	lower_dentry = lower_path.dentry;
 	lower_dir_dentry = lock_parent(lower_dentry);
-	err = vfs_rmdir(lower_dir_dentry->d_inode, lower_dentry);
+	err = vfs_rmdir(&nop_mnt_idmap, lower_dir_dentry->d_inode, lower_dentry);
 	if (err)
 		goto out;
 
@@ -207,7 +207,7 @@ out:
 	return err;
 }
 
-static int sharefs_rename(struct inode *old_dir, struct dentry *old_dentry,
+static int sharefs_rename(struct mnt_idmap *idmap, struct inode *old_dir, struct dentry *old_dentry,
 				struct inode *new_dir, struct dentry *new_dentry,
 				unsigned int flags)
 {
@@ -218,6 +218,7 @@ static int sharefs_rename(struct inode *old_dir, struct dentry *old_dentry,
 	struct dentry *lower_new_dir_dentry = NULL;
 	struct dentry *trap = NULL;
 	struct path lower_old_path, lower_new_path;
+	struct renamedata rename_data;
 
 	if (flags)
 		return -EINVAL;
@@ -240,9 +241,14 @@ static int sharefs_rename(struct inode *old_dir, struct dentry *old_dentry,
 		goto out;
 	}
 
-	err = vfs_rename(lower_old_dir_dentry->d_inode, lower_old_dentry,
-			 lower_new_dir_dentry->d_inode, lower_new_dentry,
-			 NULL, 0);
+	rename_data.old_mnt_idmap  = &nop_mnt_idmap;
+	rename_data.old_dir = lower_old_dir_dentry->d_inode;
+	rename_data.old_dentry = lower_old_dentry;
+	rename_data.new_mnt_idmap = &nop_mnt_idmap;
+	rename_data.new_dir = lower_new_dir_dentry->d_inode;
+	rename_data.new_dentry = lower_new_dentry;
+	rename_data.flags = flags;
+	err = vfs_rename(&rename_data);
 	if (err)
 		goto out;
 
@@ -263,8 +269,9 @@ out:
 	sharefs_put_lower_path(new_dentry, &lower_new_path);
 	return err;
 }
+#endif
 
-static int sharefs_setattr(struct dentry *dentry, struct iattr *ia)
+static int sharefs_setattr(struct mnt_idmap *idmap, struct dentry *dentry, struct iattr *ia)
 {
 	int err;
 	struct dentry *lower_dentry;
@@ -280,7 +287,7 @@ static int sharefs_setattr(struct dentry *dentry, struct iattr *ia)
 	 * calling notify_change on the lower inode.
 	 */
 
-	err = setattr_prepare(dentry, ia);
+	err = setattr_prepare(&nop_mnt_idmap, dentry, ia);
 	if (err)
 		goto out_err;
 
@@ -323,7 +330,7 @@ static int sharefs_setattr(struct dentry *dentry, struct iattr *ia)
 	 */
 
 	inode_lock(d_inode(lower_dentry));
-	err = notify_change(lower_dentry, &lower_ia, /* note: lower_ia */
+	err = notify_change(&nop_mnt_idmap, lower_dentry, &lower_ia, /* note: lower_ia */
 			    NULL);
 	inode_unlock(d_inode(lower_dentry));
 
@@ -343,7 +350,6 @@ out:
 out_err:
 	return err;
 }
-#endif
 
 const struct inode_operations sharefs_symlink_iops = {
 	.permission	= sharefs_permission,
@@ -357,13 +363,13 @@ const struct inode_operations sharefs_dir_iops = {
 	.permission	= sharefs_permission,
 	.getattr	= sharefs_getattr,
 	.listxattr	= sharefs_listxattr,
+	.setattr	= sharefs_setattr,
 #ifdef CONFIG_SHAREFS_SUPPORT_WRITE
 	.unlink		= sharefs_unlink,
 	.rmdir		= sharefs_rmdir,
 	.rename		= sharefs_rename,
 	.create		= sharefs_create,
 	.mkdir		= sharefs_mkdir,
-	.setattr	= sharefs_setattr,
 #endif
 };
 
@@ -371,7 +377,5 @@ const struct inode_operations sharefs_main_iops = {
 	.permission	= sharefs_permission,
 	.getattr	= sharefs_getattr,
 	.listxattr	= sharefs_listxattr,
-#ifdef CONFIG_SHAREFS_SUPPORT_WRITE
 	.setattr        = sharefs_setattr,
-#endif
 };
