@@ -202,6 +202,8 @@ static inline unsigned long drm_vma_node_size(struct drm_vma_offset_node *node)
  */
 static inline __u64 drm_vma_node_offset_addr(struct drm_vma_offset_node *node)
 {
+	printk(KERN_WARNING "[w50043774] IN drm_vma_node_offset_addr\n");
+	printk(KERN_WARNING "[w50043774] node->vm_node.start = %llu, PAGE_SHIFT = %d\n", (__u64)node->vm_node.start, PAGE_SHIFT);
 	return ((__u64)node->vm_node.start) << PAGE_SHIFT;
 }
 
