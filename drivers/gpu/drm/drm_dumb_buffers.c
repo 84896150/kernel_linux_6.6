@@ -119,18 +119,27 @@ int drm_mode_create_dumb_ioctl(struct drm_device *dev,
 int drm_mode_mmap_dumb_ioctl(struct drm_device *dev,
 			     void *data, struct drm_file *file_priv)
 {
+	printk(KERN_WARNING "[w50043774] IN drm_mode_mmap_dumb_ioctl\n");
 	struct drm_mode_map_dumb *args = data;
 
-	if (!dev->driver->dumb_create)
+	if (!dev->driver->dumb_create) {
+		printk(KERN_WARNING "[w50043774] if (!dev->driver->dumb_create)\n");
 		return -ENOSYS;
+	}
 
-	if (dev->driver->dumb_map_offset)
+	if (dev->driver->dumb_map_offset) {
+		printk(KERN_WARNING "[w50043774] if (dev->driver->dumb_map_offset)\n");
 		return dev->driver->dumb_map_offset(file_priv, dev,
 						    args->handle,
 						    &args->offset);
-	else
-		return drm_gem_dumb_map_offset(file_priv, dev, args->handle,
+	} else {
+		printk(KERN_WARNING "[w50043774] if (!dev->driver->dumb_map_offset)\n");
+		printk(KERN_WARNING "[w50043774] before: args->offset = %u\n", args->offset);
+		int retval = drm_gem_dumb_map_offset(file_priv, dev, args->handle,
 					       &args->offset);
+		printk(KERN_WARNING "[w50043774] after: retval = %d, args->offset = %u\n", retval, args->offset);
+		return retval;
+	}
 }
 
 int drm_mode_destroy_dumb(struct drm_device *dev, u32 handle,
