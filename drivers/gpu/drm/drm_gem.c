@@ -314,22 +314,28 @@ EXPORT_SYMBOL(drm_gem_handle_delete);
 int drm_gem_dumb_map_offset(struct drm_file *file, struct drm_device *dev,
 			    u32 handle, u64 *offset)
 {
+	printk(KERN_WARNING "[w50043774] IN drm_gem_dumb_map_offset\n");
 	struct drm_gem_object *obj;
 	int ret;
 
 	obj = drm_gem_object_lookup(file, handle);
-	if (!obj)
+	if (!obj) {
+		printk(KERN_WARNING "[w50043774] if (!obj), return -ENOENT\n");
 		return -ENOENT;
+	}
 
 	/* Don't allow imported objects to be mapped */
 	if (obj->import_attach) {
+		printk(KERN_WARNING "[w50043774] if (obj->import_attach), goto out\n");
 		ret = -EINVAL;
 		goto out;
 	}
 
 	ret = drm_gem_create_mmap_offset(obj);
-	if (ret)
+	if (ret) {
+		printk(KERN_WARNING "[w50043774] if (ret), goto out\n");
 		goto out;
+	}
 
 	*offset = drm_vma_node_offset_addr(&obj->vma_node);
 out:
