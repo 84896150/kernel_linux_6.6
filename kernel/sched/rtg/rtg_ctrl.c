@@ -649,8 +649,10 @@ static int parse_add_rtg_thread(const struct rtg_grp_data *rs_data)
 								    frame_info->thread[add_index]);
 		if (frame_info->thread[add_index]) {
 			atomic_set(&frame_info->thread_prio[add_index], prio);
+			pr_err("[lqw] parse_add_rtg_thread: atomic_set prio=%d!\n", prio);
 			frame_info->thread_num++;
 			add_index = frame_info->thread_num;
+			pr_err("[lqw] parse_add_rtg_thread: add_index=%d!\n", add_index);
 		} else {
 			fail_num++;
 		}
@@ -717,6 +719,7 @@ long ctrl_set_rtg(int abi, void __user *uarg)
 		ret = parse_create_rtg_grp(&rs_data);
 		break;
 	case CMD_ADD_RTG_THREAD:
+		pr_err("[lqw] CMD_ADD_RTG_THREAD");
 		ret = parse_add_rtg_thread(&rs_data);
 		break;
 	case CMD_REMOVE_RTG_THREAD:
