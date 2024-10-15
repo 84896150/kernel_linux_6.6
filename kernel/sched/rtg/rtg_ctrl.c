@@ -717,6 +717,8 @@ long ctrl_set_rtg(int abi, void __user *uarg)
 		ret = parse_create_rtg_grp(&rs_data);
 		break;
 	case CMD_ADD_RTG_THREAD:
+		// trace_rtg_frame_sched(1, "lqw-test_CMD_ADD_RTG_THREAD", 1);
+		pr_err("[lqw] CMD_ADD_RTG_THREAD");
 		ret = parse_add_rtg_thread(&rs_data);
 		break;
 	case CMD_REMOVE_RTG_THREAD:
