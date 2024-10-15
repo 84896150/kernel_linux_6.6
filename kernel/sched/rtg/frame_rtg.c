@@ -502,6 +502,17 @@ struct task_struct *update_frame_thread(struct frame_info *frame_info,
 	int new_prio = prio;
 	bool update_ret = false;
 
+	// trace_rtg_frame_sched(1, "lqw-test-update_frame_thread", 1);
+	// trace_rtg_frame_sched(1, "lqw-test-pid", pid);
+	// trace_rtg_frame_sched(1, "lqw-old_task->pid", old_task->pid);
+	// trace_rtg_frame_sched(1, "lqw-old_prio", old_prio);
+	// trace_rtg_frame_sched(1, "lqw-test-new_prio", new_prio);
+	pr_info("[lqw] update_frame_thread: pid=%d old_task->pid=%d old_prio=%d new_prio=%d\n",
+	pid,
+	old_task->pid,
+	old_prio,
+	new_prio
+	);
 	if (pid > 0) {
 		if (old_task && (pid == old_task->pid) && (old_prio == new_prio)) {
 			if (is_rt_task && atomic_read(&frame_info->curr_rt_thread_num) <
