@@ -404,7 +404,11 @@ static int do_set_rtg_sched(struct task_struct *task, bool is_rtg,
 	struct sched_param sp = {0};
 
 	if (is_rtg) {
+		pr_err("[lqw] do_set_rtg_sched: is_rtg = %d\n", is_rtg);
 		if (is_rt_task) {
+			pr_err("[lqw] do_set_rtg_sched: is_rt_task = %d\n", is_rt_task);
+			pr_err("[lqw] do_set_rtg_sched: test_and_read_rtg_rt_thread_num() = %d\n", test_and_read_rtg_rt_thread_num());
+			pr_err("[lqw] do_set_rtg_sched: RTG_MAX_RT_THREAD_NUM = %d\n", RTG_MAX_RT_THREAD_NUM);
 			if (test_and_read_rtg_rt_thread_num() >= RTG_MAX_RT_THREAD_NUM)
 				// rtg_rt_thread_num is inavailable, set policy to CFS
 				goto skip_setpolicy;
@@ -480,16 +484,22 @@ static bool set_frame_rtg_thread(int grp_id, struct task_struct *task,
 	if (!task)
 		return false;
 	depth = task->rtg_depth;
-	if (is_rtg)
+	pr_err("[lqw] set_frame_rtg_thread: depth=%d\n", depth);
+	if (is_rtg) {
 		task->rtg_depth = STATIC_RTG_DEPTH;
-	else
+		pr_err("[lqw] set_frame_rtg_thread: if (is_rtg) task->rtg_depth = %d\n", STATIC_RTG_DEPTH);
+	} else {
+		pr_err("[lqw] set_frame_rtg_thread: else task->rtg_depth = 0;\n");
 		task->rtg_depth = 0;
+	}
 
 	if (set_rtg_sched(task, is_rtg, grp_id, prio) < 0) {
 		task->rtg_depth = depth;
+		pr_err("[lqw] set_frame_rtg_thread: return false;\n");
 		return false;
 	}
 
+	pr_err("[lqw] set_frame_rtg_thread: return true;\n");
 	return true;
 }
 
@@ -502,14 +512,26 @@ struct task_struct *update_frame_thread(struct frame_info *frame_info,
 	int new_prio = prio;
 	bool update_ret = false;
 
+	pr_err("[lqw] update_frame_thread: pid=%d\n", pid);
+	pr_err("[lqw] update_frame_thread: old_task->pid=%d\n", old_task->pid);
+	pr_err("[lqw] update_frame_thread: old_task=%d\n", old_task);
+	pr_err("[lqw] update_frame_thread: old_prio=%d\n", old_prio);
+	pr_err("[lqw] update_frame_thread: new_prio=%d\n", new_prio);
+	pr_err("[lqw] update_frame_thread: atomic_read(&frame_info->curr_rt_thread_num)=%d\n",atomic_read(&frame_info->curr_rt_thread_num));
+	pr_err("[lqw] update_frame_thread: atomic_read(&frame_info->max_rt_thread_num)=%d\n",atomic_read(&frame_info->max_rt_thread_num));
+	pr_err("[lqw] update_frame_thread: atomic_read(&frame_info->frame_sched_state)=%d\n",atomic_read(&frame_info->frame_sched_state));
+	pr_err("[lqw] update_frame_thread: before: atomic_read(&frame_info->curr_rt_thread_num)=%d\n",atomic_read(&frame_info->curr_rt_thread_num));
 	if (pid > 0) {
+		pr_err("[lqw] update_frame_thread: (pid > 0)\n");		  
 		if (old_task && (pid == old_task->pid) && (old_prio == new_prio)) {
 			if (is_rt_task && atomic_read(&frame_info->curr_rt_thread_num) <
 			    atomic_read(&frame_info->max_rt_thread_num) &&
 			    (atomic_read(&frame_info->frame_sched_state) == 1))
 				atomic_inc(&frame_info->curr_rt_thread_num);
+				pr_err("[lqw] update_frame_thread: after: atomic_read(&frame_info->curr_rt_thread_num)=%d\n",atomic_read(&frame_info->curr_rt_thread_num));
 			trace_rtg_frame_sched(frame_info->rtg->id, "curr_rt_thread_num",
 					      atomic_read(&frame_info->curr_rt_thread_num));
+			pr_err("[lqw] update_frame_thread: return old_task;\n");		  
 			return old_task;
 		}
 		rcu_read_lock();
@@ -522,11 +544,18 @@ struct task_struct *update_frame_thread(struct frame_info *frame_info,
 			      atomic_read(&frame_info->frame_sched_state));
 	if (atomic_read(&frame_info->frame_sched_state) == 1) {
 		if (task && is_rt_task) {
+			pr_err("[lqw] update_frame_thread: (task && is_rt_task)\n");		  
 			if (atomic_read(&frame_info->curr_rt_thread_num) <
 			    atomic_read(&frame_info->max_rt_thread_num))
+				{
 				atomic_inc(&frame_info->curr_rt_thread_num);
+				pr_err("[lqw] update_frame_thread: atomic_inc\n");
+				}
 			else
+				{
 				new_prio = NOT_RT_PRIO;
+				pr_err("[lqw] update_frame_thread: new_prio = NOT_RT_PRIO;\n");
+				}		  
 		}
 		trace_rtg_frame_sched(frame_info->rtg->id, "curr_rt_thread_num",
 				      atomic_read(&frame_info->curr_rt_thread_num));
@@ -535,6 +564,9 @@ struct task_struct *update_frame_thread(struct frame_info *frame_info,
 
 		set_frame_rtg_thread(frame_info->rtg->id, old_task, false, NOT_RT_PRIO);
 		update_ret = set_frame_rtg_thread(frame_info->rtg->id, task, true, new_prio);
+		pr_err("[lqw] update_frame_thread: set_frame_rtg_thread(%d, %d, true, %d)\n", frame_info->rtg->id, task, new_prio);		 
+		pr_err("[lqw] update_frame_thread: update_ret = %d;\n", update_ret);		  
+
 	}
 	if (old_task)
 		put_task_struct(old_task);
