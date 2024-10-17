@@ -127,7 +127,7 @@ void init_purgeable_ashmem_trigger(void)
 {
 	struct proc_dir_entry *entry = NULL;
 
-	entry = proc_create_data("purgeable_ashmem_trigger", 0666,
+	entry = proc_create_data("purgeable_ashmem_trigger", 0660,
 			NULL, &purgeable_ashmem_trigger_fops, NULL);
 	if (!entry)
 		pr_err("Failed to create purgeable ashmem trigger\n");
