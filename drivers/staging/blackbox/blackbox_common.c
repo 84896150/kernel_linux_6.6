@@ -74,9 +74,11 @@ int full_write_file(const char *pfile_path, char *buf,
 	old_fs = get_fs();
 	set_fs(KERNEL_DS);
 #endif
-
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+	ret = __kernel_write(filp, (const void *)buf, buf_size, &pos);
+#else
 	ret = vfs_write(filp, buf, buf_size, &pos);
-
+#endif
 #if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
 	set_fs(old_fs);
 #endif
