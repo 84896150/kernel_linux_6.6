@@ -505,6 +505,13 @@ config USB_CONFIGFS_F_TCM
 	  Both protocols can work on USB2.0 and USB3.0.
 	  UAS utilizes the USB 3.0 feature called streams support.
 
+config DRIVERS_HDF_USB_F_GENERIC
+	bool "Enable F_GENERIC driver"
+	default y
+	depends on DRIVERS_HDF
+	help
+		Answer Y to choice HDF USB F_GENERIC driver.
+
 source "drivers/usb/gadget/legacy/Kconfig"
 
 endif # USB_GADGET
