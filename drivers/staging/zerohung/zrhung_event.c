@@ -29,10 +29,10 @@ int zrhung_send_event_bbox(const char *domain, const char *event_name, const cha
 		goto hisysevent_end;
 	}
     ret = hisysevent_put_string(event, "BBOX_SYSRESET", reset);
-	if (ret != 0) {
-		pr_err("failed to put BBOX_SYSRESET to event, ret=%d", ret);
-		goto hisysevent_end;
-	}
+    if (ret != 0) {
+        pr_err("failed to put BBOX_SYSRESET to event, ret=%d", ret);
+        goto hisysevent_end;
+    }
 	ret = hisysevent_write(event);
 
 hisysevent_end:
