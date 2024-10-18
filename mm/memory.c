@@ -77,9 +77,7 @@
 #include <linux/ptrace.h>
 #include <linux/vmalloc.h>
 #include <linux/sched/sysctl.h>
-#ifdef CONFIG_MEM_PURGEABLE
-#include <linux/mm_purgeable.h>
-#endif
+
 #include <trace/events/kmem.h>
 
 #include <asm/io.h>
@@ -1428,10 +1426,6 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 			unsigned int delay_rmap;
 
 			page = vm_normal_page(vma, addr, ptent);
-#ifdef CONFIG_MEM_PURGEABLE
-			if (vma->vm_flags & VM_USEREXPTE)
-				page =  NULL;
-#endif
 			if (unlikely(!should_zap_page(details, page)))
 				continue;
 			ptent = ptep_get_and_clear_full(mm, addr, pte,
@@ -1444,10 +1438,7 @@ static unsigned long zap_pte_range(struct mmu_gather *tlb,
 				ksm_might_unmap_zero_page(mm, ptent);
 				continue;
 			}
-#ifdef CONFIG_MEM_PURGEABLE
-			if (vma->vm_flags & VM_PURGEABLE)
-				uxpte_clear_present(vma, addr);
-#endif
+
 			delay_rmap = 0;
 			if (!PageAnon(page)) {
 				if (pte_dirty(ptent)) {
@@ -3153,13 +3144,6 @@ static vm_fault_t wp_page_copy(struct vm_fault *vmf)
 		 */
 		ptep_clear_flush(vma, vmf->address, vmf->pte);
 		folio_add_new_anon_rmap(new_folio, vma, vmf->address);
-#ifdef CONFIG_MEM_PURGEABLE
-		if (vma->vm_flags & VM_PURGEABLE) {
-			pr_info("set wp new folio %lx purgeable\n", folio_pfn(new_folio));
-			folio_set_purgeable(new_folio);
-			uxpte_set_present(vma, vmf->address);
-		}
-#endif
 		folio_add_lru_vma(new_folio, vma);
 		/*
 		 * We call the notify macro here because, when using secondary
@@ -4119,23 +4103,11 @@ static vm_fault_t do_anonymous_page(struct vm_fault *vmf)
 	if (pte_alloc(vma->vm_mm, vmf->pmd))
 		return VM_FAULT_OOM;
 
-#ifdef CONFIG_MEM_PURGEABLE
-	/* use extra page table for userexpte */
-	if (vma->vm_flags & VM_USEREXPTE) {
-		if (do_uxpte_page_fault(vmf, &entry))
-			goto oom;
-		else
-			goto got_page;
-	}
-#endif
 	/* Use the zero-page for reads */
 	if (!(vmf->flags & FAULT_FLAG_WRITE) &&
 			!mm_forbids_zeropage(vma->vm_mm)) {
 		entry = pte_mkspecial(pfn_pte(my_zero_pfn(vmf->address),
 						vma->vm_page_prot));
-#ifdef CONFIG_MEM_PURGEABLE
-got_page:
-#endif
 		vmf->pte = pte_offset_map_lock(vma->vm_mm, vmf->pmd,
 				vmf->address, &vmf->ptl);
 		if (!vmf->pte)
@@ -4200,16 +4172,8 @@ got_page:
 
 	inc_mm_counter(vma->vm_mm, MM_ANONPAGES);
 	folio_add_new_anon_rmap(folio, vma, vmf->address);
-#ifdef CONFIG_MEM_PURGEABLE
-	if (vma->vm_flags & VM_PURGEABLE)
-		folio_set_purgeable(folio);
-#endif	
 	folio_add_lru_vma(folio, vma);
 setpte:
-#ifdef CONFIG_MEM_PURGEABLE
-	if (vma->vm_flags & VM_PURGEABLE)
-		uxpte_set_present(vma, vmf->address);
-#endif
 	if (uffd_wp)
 		entry = pte_mkuffd_wp(entry);
 	set_pte_at(vma->vm_mm, vmf->address, vmf->pte, entry);

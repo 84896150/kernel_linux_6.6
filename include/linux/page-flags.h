@@ -136,9 +136,6 @@ enum pageflags {
 	PG_arch_2,
 	PG_arch_3,
 #endif
-#ifdef CONFIG_MEM_PURGEABLE
-	PG_purgeable,
-#endif
 #ifdef CONFIG_SECURITY_XPM
 	PG_xpm_readonly,
 	PG_xpm_writetainted,
@@ -616,12 +613,6 @@ __PAGEFLAG(Reported, reported, PF_NO_COMPOUND)
 PAGEFLAG(VmemmapSelfHosted, vmemmap_self_hosted, PF_ANY)
 #else
 PAGEFLAG_FALSE(VmemmapSelfHosted, vmemmap_self_hosted)
-#endif
-
-#ifdef CONFIG_MEM_PURGEABLE
-PAGEFLAG(Purgeable, purgeable, PF_ANY)
-#else
-PAGEFLAG_FALSE(Purgeable)
 #endif
 
 /*

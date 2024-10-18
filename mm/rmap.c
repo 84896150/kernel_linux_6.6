@@ -75,7 +75,6 @@
 #include <linux/memremap.h>
 #include <linux/userfaultfd_k.h>
 #include <linux/mm_inline.h>
-#include <linux/mm_purgeable.h>
 
 #include <asm/tlbflush.h>
 
@@ -812,10 +811,6 @@ static bool folio_referenced_one(struct folio *folio,
 	while (page_vma_mapped_walk(&pvmw)) {
 		address = pvmw.address;
 
-#ifdef CONFIG_MEM_PURGEABLE
-		if (!(vma->vm_flags & VM_PURGEABLE))
-			pra->vm_flags &= ~VM_PURGEABLE;
-#endif
 		if ((vma->vm_flags & VM_LOCKED) &&
 		    (!folio_test_large(folio) || !pvmw.pte)) {
 			/* Restore the mlock which got missed */
@@ -855,9 +850,6 @@ static bool folio_referenced_one(struct folio *folio,
 	if (referenced) {
 		pra->referenced++;
 		pra->vm_flags |= vma->vm_flags & ~VM_LOCKED;
-#ifdef CONFIG_MEM_PURGEABLE
-		pra->vm_flags |= vma->vm_flags & ~VM_PURGEABLE;
-#endif		
 	}
 
 	if (!pra->mapcount)
@@ -909,9 +901,6 @@ int folio_referenced(struct folio *folio, int is_locked,
 	struct folio_referenced_arg pra = {
 		.mapcount = folio_mapcount(folio),
 		.memcg = memcg,
-#ifdef CONFIG_MEM_PURGEABLE
-		.vm_flags = VM_PURGEABLE,
-#endif
 	};
 	struct rmap_walk_control rwc = {
 		.rmap_one = folio_referenced_one,
@@ -1533,13 +1522,6 @@ static bool try_to_unmap_one(struct folio *folio, struct vm_area_struct *vma,
 		/* Unexpected PMD-mapped THP? */
 		VM_BUG_ON_FOLIO(!pvmw.pte, folio);
 
-#ifdef CONFIG_MEM_PURGEABLE
-		if ((vma->vm_flags & VM_PURGEABLE) && !lock_uxpte(vma, address)) {
-			ret = false;
-			page_vma_mapped_walk_done(&pvmw);
-			break;
-		}
-#endif
 		/*
 		 * If the folio is in an mlock()d vma, we must not swap it out.
 		 */
@@ -1657,17 +1639,7 @@ static bool try_to_unmap_one(struct folio *folio, struct vm_area_struct *vma,
 				set_pte_at(mm, address, pvmw.pte, pteval);
 			}
 
-#ifdef CONFIG_MEM_PURGEABLE
-		} else if ((vma->vm_flags & VM_PURGEABLE) || (pte_unused(pteval) &&
-			   !userfaultfd_armed(vma))) {
-#else
 		} else if (pte_unused(pteval) && !userfaultfd_armed(vma)) {
-#endif
-#ifdef CONFIG_MEM_PURGEABLE
-			if (vma->vm_flags & VM_PURGEABLE)
-				unlock_uxpte(vma, address);
-#endif
-
 			/*
 			 * The guest indicated that the page content is of no
 			 * interest anymore. Simply discard the pte, vmscan

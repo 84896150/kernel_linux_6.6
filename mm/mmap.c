@@ -59,11 +59,6 @@
 
 #include "internal.h"
 
-#ifdef CONFIG_MEM_PURGEABLE
-#define MAP_PURGEABLE  0x04            /* purgeable memory */
-#define MAP_USEREXPTE  0x08            /* userspace extension page table */
-#endif
-
 #ifndef arch_mmap_check
 #define arch_mmap_check(addr, len, flags)	(0)
 #endif
@@ -1358,16 +1353,6 @@ unsigned long do_mmap(struct file *file, unsigned long addr,
 			 */
 			pgoff = addr >> PAGE_SHIFT;
 			break;
-#ifdef CONFIG_MEM_PURGEABLE
-		case MAP_PURGEABLE:
-			vm_flags |= VM_PURGEABLE;
-			pr_info("vm_flags purgeable = %lx.\n", VM_PURGEABLE);
-			break;
-		case MAP_USEREXPTE:
-			vm_flags |= VM_USEREXPTE;
-			pr_info("vm_flags useredpte = %lx.\n", VM_USEREXPTE);
-			break;
-#endif
 		default:
 			return -EINVAL;
 		}
