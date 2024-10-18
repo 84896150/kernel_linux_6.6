@@ -226,8 +226,7 @@ static void save_history_log(const char *log_root_dir, struct error_info *info,
 #ifdef CONFIG_DFX_ZEROHUNG
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
 	bbox_sysreset = need_sys_reset ? "true" : "false";
-	zrhung_send_event_bbox_time("KERNEL_VENDOR", info->category, timestamp);
-	zrhung_send_event_bbox_sysreset("KERNEL_VENDOR", info->category, bbox_sysreset);
+	zrhung_send_event_bbox("KERNEL_VENDOR", info->category, timestamp, bbox_sysreset);
 #else
 	zrhung_send_event("KERNEL_VENDOR", info->category, info->error_desc);
 #endif
