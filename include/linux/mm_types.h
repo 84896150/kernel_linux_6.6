@@ -703,6 +703,10 @@ struct mm_struct {
 #endif
 		unsigned long task_size;	/* size of task vm space */
 		pgd_t * pgd;
+#ifdef CONFIG_MEM_PURGEABLE
+		void *uxpgd;
+		spinlock_t uxpgd_lock;
+#endif
 
 #ifdef CONFIG_MEMBARRIER
 		/**

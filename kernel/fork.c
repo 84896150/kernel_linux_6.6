@@ -99,7 +99,9 @@
 #include <linux/stackprotector.h>
 #include <linux/user_events.h>
 #include <linux/iommu.h>
-
+#ifdef CONFIG_MEM_PURGEABLE
+#include <linux/mm_purgeable.h>
+#endif
 #include <asm/pgalloc.h>
 #include <linux/uaccess.h>
 #include <asm/mmu_context.h>
@@ -793,6 +795,9 @@ fail_nomem:
 
 static inline int mm_alloc_pgd(struct mm_struct *mm)
 {
+#ifdef CONFIG_MEM_PURGEABLE
+	mm_init_uxpgd(mm);
+#endif
 	mm->pgd = pgd_alloc(mm);
 	if (unlikely(!mm->pgd))
 		return -ENOMEM;
@@ -802,6 +807,9 @@ static inline int mm_alloc_pgd(struct mm_struct *mm)
 static inline void mm_free_pgd(struct mm_struct *mm)
 {
 	pgd_free(mm, mm->pgd);
+#ifdef CONFIG_MEM_PURGEABLE
+	mm_clear_uxpgd(mm);
+#endif
 }
 #else
 static int dup_mmap(struct mm_struct *mm, struct mm_struct *oldmm)
