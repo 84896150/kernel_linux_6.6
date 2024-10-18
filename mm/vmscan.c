@@ -2025,7 +2025,13 @@ retry:
 			/* follow __remove_mapping for reference */
 			if (!folio_ref_freeze(folio, 1))
 				goto keep_locked;
-
+// missing
+/*
+			if (folio_test_dirty(folio) && references != FOLIOREF_RECLAIM_PURGEABLE) {
+				folio__ref_unfreeze(folio, 1);
+				goto keep_locked;
+			}
+*/
 			/*
 			 * The folio has only one reference left, which is
 			 * from the isolation. After the caller puts the
