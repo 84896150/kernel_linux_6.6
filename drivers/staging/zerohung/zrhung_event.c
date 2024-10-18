@@ -13,7 +13,7 @@
 #include <linux/version.h>
 
 #if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
-int zrhung_send_event_bbox_time(const char *domain, const char *event_name, const char *timestamp, const char *reset)
+int zrhung_send_event_bbox(const char *domain, const char *event_name, const char *timestamp, const char *reset)
 {
 	struct hiview_hisysevent *event = NULL;
 	int ret = 0;
