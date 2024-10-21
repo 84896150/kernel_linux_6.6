@@ -149,7 +149,7 @@ int hisysevent_write(struct hiview_hisysevent *event)
 	if (!filp || IS_ERR(filp)) {
 		ret = PTR_ERR(filp);
 		pr_err("failed to access '%s', res=%d", HISYSEVENT_WRITER_DEV, ret);
-		goto filp_err;
+		goto event_wrote_err;
 	}
 
 	vcount = 0;
@@ -170,7 +170,7 @@ int hisysevent_write(struct hiview_hisysevent *event)
 
 	if (ret < 0)
 		pr_err("failed to write hisysevent, ret=%d", ret);
-filp_err:
+
 	filp_close(filp, NULL);
 #endif /*KERNEL_VERSION*/
 event_wrote_err:
