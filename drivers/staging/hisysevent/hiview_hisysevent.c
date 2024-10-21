@@ -21,6 +21,10 @@
 #include <asm/current.h>
 #include <linux/version.h>
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+int hievent_write_internal(const char *buffer, size_t buf_len);
+#endif
+
 #include "hisysevent_builder.h"
 #include "hisysevent_raw_data.h"
 
@@ -94,6 +98,9 @@ int hisysevent_write(struct hiview_hisysevent *event)
 {
 	struct hisysevent_raw_data *raw_data;
 	int ret;
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+	int retval;
+#endif
 	struct file *filp;
 	unsigned long vcount;
 	struct iovec vec[3];
@@ -130,6 +137,13 @@ int hisysevent_write(struct hiview_hisysevent *event)
 		goto event_wrote_err;
 	}
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+	retval = hievent_write_internal(raw_data->data, raw_data->len + 1);
+	if (retval < 0) {
+		retval = -EIO;
+		goto event_wrote_err;
+	}
+#else
 	filp = filp_open(HISYSEVENT_WRITER_DEV, O_WRONLY, 0);
 
 	if (!filp || IS_ERR(filp)) {
@@ -158,7 +172,7 @@ int hisysevent_write(struct hiview_hisysevent *event)
 		pr_err("failed to write hisysevent, ret=%d", ret);
 
 	filp_close(filp, NULL);
-
+#endif /*KERNEL_VERSION*/
 event_wrote_err:
 	raw_data_destroy(raw_data);
 	return ret;

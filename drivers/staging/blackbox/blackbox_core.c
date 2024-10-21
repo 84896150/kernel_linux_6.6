@@ -204,7 +204,9 @@ static void save_history_log(const char *log_root_dir, struct error_info *info,
 {
 	char history_log_path[PATH_MAX_LEN];
 	char *buf;
-
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+	const char *bbox_sysreset;
+#endif
 	if (unlikely(!log_root_dir || !info || !timestamp)) {
 		bbox_print_err("log_root_dir: %p, info: %p, timestamp: %p\n",
 				log_root_dir, info, timestamp);
@@ -215,13 +217,19 @@ static void save_history_log(const char *log_root_dir, struct error_info *info,
 	if (!buf)
 		return;
 	memset(buf, 0, HISTORY_LOG_MAX_LEN + 1);
-
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
 	scnprintf(buf, HISTORY_LOG_MAX_LEN, HISTORY_LOG_FORMAT,
 			get_top_category(info->module, info->event), info->module,
 			info->category, info->event, timestamp,
 			need_sys_reset ? "true" : "false", info->error_desc, log_root_dir);
+#endif
 #ifdef CONFIG_DFX_ZEROHUNG
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+	bbox_sysreset = need_sys_reset ? "true" : "false";
+	zrhung_send_event_bbox("KERNEL_VENDOR", info->category, timestamp, bbox_sysreset);
+#else
 	zrhung_send_event("KERNEL_VENDOR", info->category, info->error_desc);
+#endif
 #endif
 	memset(history_log_path, 0, sizeof(history_log_path));
 	scnprintf(history_log_path, sizeof(history_log_path) - 1,

@@ -17,6 +17,10 @@
 #include <linux/mm.h>
 #include <linux/module.h>
 #include <linux/pstore.h>
+#ifdef CONFIG_PSTORE_BLACKBOX
+#include <linux/stacktrace.h>
+#include <linux/blackbox.h>
+#endif
 #include <linux/string.h>
 #include <linux/timer.h>
 #include <linux/slab.h>
@@ -51,6 +55,7 @@ static const char * const pstore_type_names[] = {
 	"powerpc-common",
 	"pmsg",
 	"powerpc-opal",
+	"blackbox",
 };
 
 static int pstore_new_entry;
@@ -269,6 +274,110 @@ void pstore_record_init(struct pstore_record *record,
 	/* Report zeroed timestamp if called before timekeeping has resumed. */
 	record->time = ns_to_timespec64(ktime_get_real_fast_ns());
 }
+
+/*
+ * Store the customised fault log
+ */
+#ifdef CONFIG_PSTORE_BLACKBOX
+#define PSTORE_FLAG           "PSTORE"
+#define CALLSTACK_MAX_ENTRIES 20
+static void dump_stacktrace(char *pbuf, size_t buf_size, bool is_panic)
+{
+	int i;
+	size_t stack_len = 0;
+	size_t com_len = 0;
+	unsigned long entries[CALLSTACK_MAX_ENTRIES];
+	unsigned int nr_entries;
+	char tmp_buf[ERROR_DESC_MAX_LEN];
+	bool find_panic = false;
+
+	if (unlikely(!pbuf || !buf_size))
+		return;
+	memset(pbuf, 0, buf_size);
+	memset(tmp_buf, 0, sizeof(tmp_buf));
+	nr_entries = stack_trace_save(entries, ARRAY_SIZE(entries), 0);
+	com_len = scnprintf(pbuf, buf_size, "Comm:%s,CPU:%d,Stack:",
+						current->comm, raw_smp_processor_id());
+	for (i = 0; i < nr_entries; i++) {
+		if (stack_len >= sizeof(tmp_buf)) {
+			tmp_buf[sizeof(tmp_buf) - 1] = '\0';
+			break;
+		}
+		stack_len += scnprintf(tmp_buf + stack_len, sizeof(tmp_buf) - stack_len,
+				"%pS-", (void *)entries[i]);
+		if (!find_panic && is_panic) {
+			if (strncmp(tmp_buf, "panic", strlen("panic")) == 0)
+				find_panic = true;
+			else
+				(void)memset(tmp_buf, 0, sizeof(tmp_buf));
+		}
+	}
+	if (com_len >= buf_size)
+		return;
+	stack_len = min(buf_size - com_len, strlen(tmp_buf));
+	memcpy(pbuf + com_len, tmp_buf, stack_len);
+	*(pbuf + buf_size - 1) = '\0';
+}
+
+void pstore_blackbox_dump(struct kmsg_dumper *dumper, enum kmsg_dump_reason reason)
+{
+	struct fault_log_info *pfault_log_info;
+	struct pstore_record record;
+	struct kmsg_dump_iter iter;
+	size_t dst_size;
+	const char *why;
+	char *dst;
+	unsigned long	flags = 0;
+	int ret;
+
+#if defined(CONFIG_PSTORE_BLK) || defined(CONFIG_PSTORE_RAM)
+	if (!pstore_ready)
+		return;
+#endif
+	kmsg_dump_rewind(&iter);
+	why = kmsg_dump_reason_str(reason);
+
+	if (pstore_cannot_block_path(reason)) {
+		if (!spin_trylock_irqsave(&psinfo->buf_lock, flags)) {
+			pr_err("dump skipped in %s path because of concurrent dump\n",
+					in_nmi() ? "NMI" : why);
+			return;
+		}
+	} else {
+		spin_lock_irqsave(&psinfo->buf_lock, flags);
+	}
+
+	pfault_log_info = (struct fault_log_info *)psinfo->buf;
+
+	memset(pfault_log_info, 0, sizeof(*pfault_log_info));
+
+	pstore_record_init(&record, psinfo);
+
+	record.type = PSTORE_TYPE_BLACKBOX;
+	record.reason = reason;
+
+	memcpy(pfault_log_info->flag, LOG_FLAG, strlen(LOG_FLAG));
+	strncpy(pfault_log_info->info.event, why,
+					min(strlen(why), sizeof(pfault_log_info->info.event) - 1));
+	strncpy(pfault_log_info->info.module, PSTORE_FLAG,
+					min(strlen(PSTORE_FLAG), sizeof(pfault_log_info->info.module) - 1));
+	get_timestamp(pfault_log_info->info.error_time, TIMESTAMP_MAX_LEN);
+	dump_stacktrace(pfault_log_info->info.error_desc, sizeof(pfault_log_info->info.error_desc), false);
+
+	record.buf = psinfo->buf;
+	dst = psinfo->buf;
+	dst_size = psinfo->bufsize;
+
+	dst_size -= sizeof(struct fault_log_info);
+	(void)kmsg_dump_get_buffer(&iter, true, dst + sizeof(struct fault_log_info), dst_size,
+				   &(pfault_log_info->len));
+
+	record.size = sizeof(struct fault_log_info) + pfault_log_info->len;
+	ret = psinfo->write(&record);
+	spin_unlock_irqrestore(&psinfo->buf_lock, flags);
+}
+EXPORT_SYMBOL_GPL(pstore_blackbox_dump);
+#endif
 
 /*
  * callback from kmsg_dump. Save as much as we can (up to kmsg_bytes) from the

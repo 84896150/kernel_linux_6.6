@@ -10,6 +10,36 @@
 
 #include <linux/errno.h>
 #include <linux/printk.h>
+#include <linux/version.h>
+
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+int zrhung_send_event_bbox(const char *domain, const char *event_name, const char *timestamp, const char *reset)
+{
+	struct hiview_hisysevent *event = NULL;
+	int ret = 0;
+
+	event = hisysevent_create(domain, event_name, FAULT);
+	if (!event) {
+		pr_err("failed to create event");
+		return -EINVAL;
+	}
+	ret = hisysevent_put_string(event, "BBOX_TIME", timestamp);
+	if (ret != 0) {
+		pr_err("failed to put BBOX_TIME to event, ret=%d", ret);
+		goto hisysevent_end;
+	}
+    ret = hisysevent_put_string(event, "BBOX_SYSRESET", reset);
+    if (ret != 0) {
+        pr_err("failed to put BBOX_SYSRESET to event, ret=%d", ret);
+        goto hisysevent_end;
+    }
+	ret = hisysevent_write(event);
+
+hisysevent_end:
+	hisysevent_destroy(&event);
+	return ret;
+}
+#endif
 
 int zrhung_send_event(const char *domain, const char *event_name, const char *msg_buf)
 {

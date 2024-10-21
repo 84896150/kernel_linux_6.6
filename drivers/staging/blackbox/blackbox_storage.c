@@ -11,6 +11,7 @@
 #include <linux/pstore.h>
 #include <linux/blackbox_storage.h>
 #include <linux/blackbox_common.h>
+#include <linux/version.h>
 
 char *storage_material =
 #ifdef CONFIG_DEF_BLACKBOX_STORAGE
@@ -20,8 +21,13 @@ char *storage_material =
 #endif
 const struct reboot_crashlog_storage *storage_lastword __ro_after_init;
 
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+bool g_blackbox_flag = false;
+EXPORT_SYMBOL(g_blackbox_flag);
+#endif
+
 #if IS_ENABLED(CONFIG_DEF_BLACKBOX_STORAGE_BY_MEMORY)
-static DEFINE_SEMAPHORE(kmsg_sem);
+static DEFINE_SEMAPHORE(kmsg_sem, 1);
 static char *lastlog;
 unsigned int lastlog_len;
 static int get_log_by_memory(void *in, unsigned int inlen)
@@ -45,7 +51,7 @@ static void do_kmsg_dump(struct kmsg_dumper *dumper,
 				enum kmsg_dump_reason reason)
 {
 	struct fault_log_info *pinfo;
-
+	struct kmsg_dump_iter iter;
 	if (unlikely(!lastlog))
 		return;
 
@@ -54,6 +60,7 @@ static void do_kmsg_dump(struct kmsg_dumper *dumper,
 		bbox_print_err("down_trylock failed!\n");
 		return;
 	}
+	kmsg_dump_rewind(&iter);
 	pinfo = (struct fault_log_info *)lastlog;
 	(void)kmsg_dump_get_buffer(dumper, true, lastlog + sizeof(*pinfo),
 			lastlog_len - sizeof(*pinfo), (size_t *)&pinfo->len);
@@ -121,7 +128,9 @@ static int get_log_by_pstore(void *in, unsigned int inlen)
 	char pstore_file[PATH_MAX_LEN];
 	struct file *filp = NULL;
 	char *pathname = NULL;
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 192)
 	mm_segment_t old_fs;
+#endif
 	void *pbuf = NULL;
 	loff_t pos = 0;
 	static int retry;
@@ -142,12 +151,18 @@ static int get_log_by_pstore(void *in, unsigned int inlen)
 				       PTR_ERR(filp));
 			return -EBADF;
 		}
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5, 10, 197)
+
+			printk("bbox %s %d, read %s is succ\n", __func__, __LINE__, getfullpath(filp) ? getfullpath(filp) : "");
+			g_blackbox_flag = true;
+#else
 		memset(in, 0, inlen);
 		pbuf = in;
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 192)
 		old_fs = get_fs();
 		set_fs(KERNEL_DS);
-
+#endif
 		ret = vfs_read(filp, pbuf, inlen, &pos);
 		if (ret < 0) {
 			pathname = getfullpath(filp);
@@ -156,7 +171,10 @@ static int get_log_by_pstore(void *in, unsigned int inlen)
 			goto __error;
 		}
 
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 192)
 		set_fs(old_fs);
+#endif
+#endif /*KERNEL_VERSION(5, 10, 197)*/
 		file_close(filp);
 		file_delete(filp);
 		return 0;
@@ -164,7 +182,9 @@ static int get_log_by_pstore(void *in, unsigned int inlen)
 
 	return -EBADF;
 __error:
+#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 192)
 	set_fs(old_fs);
+#endif
 	file_close(filp);
 	return -EIO;
 }
