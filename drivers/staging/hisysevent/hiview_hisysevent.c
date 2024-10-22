@@ -30,6 +30,8 @@ static int CHECK_CODE = 0x7BCDABCD;
 
 #define HISYSEVENT_INFO_BUF_LEN (2048 - 6)  // 2KB - 6 (read_gap)
 
+int hievent_write_internal(const char *buffer, size_t buf_len);
+
 /* hisysevent struct */
 struct hiview_hisysevent {
 	/* hisysevent builder */
@@ -94,12 +96,10 @@ int hisysevent_write(struct hiview_hisysevent *event)
 {
 	struct hisysevent_raw_data *raw_data;
 	int ret;
+	int retval;
 	struct file *filp;
 	unsigned long vcount;
 	struct iovec vec[3];
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 192)
-	mm_segment_t oldfs;
-#endif
 	struct iov_iter iter;
 
 	if (!event) {
@@ -130,34 +130,11 @@ int hisysevent_write(struct hiview_hisysevent *event)
 		goto event_wrote_err;
 	}
 
-	filp = filp_open(HISYSEVENT_WRITER_DEV, O_WRONLY, 0);
-
-	if (!filp || IS_ERR(filp)) {
-		ret = PTR_ERR(filp);
-		pr_err("failed to access '%s', res=%d", HISYSEVENT_WRITER_DEV, ret);
+	retval = hievent_write_internal(raw_data->data, raw_data->len + 1);
+	if (retval < 0) {
+		retval = -EIO;
 		goto event_wrote_err;
 	}
-
-	vcount = 0;
-	vec[vcount].iov_base = &CHECK_CODE;
-	vec[vcount++].iov_len = sizeof(CHECK_CODE);
-	vec[vcount].iov_base = raw_data->data;
-	vec[vcount++].iov_len = raw_data->len + 1;
-
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 192)
-	oldfs = get_fs();
-	set_fs(KERNEL_DS);
-#endif
-	iov_iter_init(&iter, WRITE, vec, vcount, iov_length(vec, vcount));
-	ret = vfs_iter_write(filp, &iter, &filp->f_pos, 0);
-#if LINUX_VERSION_CODE < KERNEL_VERSION(5, 10, 192)
-	set_fs(oldfs);
-#endif
-
-	if (ret < 0)
-		pr_err("failed to write hisysevent, ret=%d", ret);
-
-	filp_close(filp, NULL);
 
 event_wrote_err:
 	raw_data_destroy(raw_data);

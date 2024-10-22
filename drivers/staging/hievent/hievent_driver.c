@@ -252,6 +252,7 @@ out:
 
 	return retval;
 }
+EXPORT_SYMBOL(hievent_write_internal);
 
 static unsigned int hievent_poll(struct file *filep, poll_table *wait)
 {
