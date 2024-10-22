@@ -6,6 +6,7 @@
 #ifndef ZRHUNG_H
 #define ZRHUNG_H
 
+int zrhung_send_event_bbox(const char *domain, const char *event_name, const char *timestamp, const char *reset);
 int zrhung_send_event(const char *domain, const char *event_name, const char *msg_buf);
 
 #endif /* ZRHUNG_H */
