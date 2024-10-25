@@ -24,9 +24,6 @@ void sys_reset(void)
 
 void change_own(char *path, int uid, int gid)
 {
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
-	mm_segment_t old_fs;
-#endif
 	int ret = -1;
 
 	if (unlikely(!path || uid == -1 || gid == -1)) {
@@ -34,17 +31,9 @@ void change_own(char *path, int uid, int gid)
 		return;
 	}
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-#endif
 	ret = ksys_chown(path, uid, gid);
 	if (ret != 0)
 		bbox_print_err("ksys_chown [%s] failed, ret: %d\n", path, ret);
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
-	set_fs(old_fs);
-#endif
 }
 
 int full_write_file(const char *pfile_path, char *buf,
@@ -52,9 +41,6 @@ int full_write_file(const char *pfile_path, char *buf,
 {
 	struct file *filp = NULL;
 	char *pathname = NULL;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
-	mm_segment_t old_fs;
-#endif
 	loff_t pos = 0;
 	int ret = -1;
 
@@ -70,16 +56,7 @@ int full_write_file(const char *pfile_path, char *buf,
 		return -EBADF;
 	}
 
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-#endif
-
-	ret = vfs_write(filp, buf, buf_size, &pos);
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
-	set_fs(old_fs);
-#endif
+	ret = __kernel_write(filp, (const void *)buf, buf_size, &pos);
 
 	file_close(filp);
 
@@ -101,11 +78,7 @@ int file_exists(const char *name)
 	if (ret)
 		return ret;
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 	ret = inode_permission(&nop_mnt_idmap, d_inode(path.dentry), MAY_ACCESS);
-#else
-	ret = inode_permission(d_inode(path.dentry), MAY_ACCESS);
-#endif
 	path_put(&path);
 	return ret;
 }
@@ -127,11 +100,7 @@ static int create_new_dir(char *name)
 		if (IS_ERR(dentry))
 			return PTR_ERR(dentry);
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 		ret = vfs_mkdir(&nop_mnt_idmap, d_inode(path.dentry), dentry, BBOX_DIR_LIMIT);
-#else
-		ret = vfs_mkdir(d_inode(path.dentry), dentry, BBOX_DIR_LIMIT);
-#endif
 		if (ret && ret != -EEXIST)
 			bbox_print_err("Create dir [%s] failed! ret: %d\n", name, ret);
 
@@ -228,19 +197,8 @@ static inline void unlock_dir(struct dentry *dentry)
 struct file *file_open(const char *filename, int open_mode, int mode)
 {
 	struct file *filp = NULL;
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
-	mm_segment_t old_fs;
-#endif
-
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
-	old_fs = get_fs();
-	set_fs(KERNEL_DS);
-#endif
 
 	filp = filp_open(filename, open_mode, mode);
-#if LINUX_VERSION_CODE <= KERNEL_VERSION(5, 10, 197)
-	set_fs(old_fs);
-#endif
 
 	return filp;
 }
@@ -267,11 +225,7 @@ int file_delete(struct file *filp)
 
 	if (dentry->d_parent == parent) {
 		dget(dentry);
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(6, 6, 0)
 		ret = vfs_unlink(&nop_mnt_idmap, d_inode(parent), dentry, NULL);
-#else
-		ret = vfs_unlink(d_inode(parent), dentry, NULL);
-#endif
 		dput(dentry);
 	}
 
