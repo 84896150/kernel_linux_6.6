@@ -827,7 +827,11 @@ int amdgpu_gem_op_ioctl(struct drm_device *dev, void *data,
 		void __user *out = u64_to_user_ptr(args->value);
 
 		info.bo_size = robj->tbo.base.size;
+#ifdef CONFIG_LOONGARCH
+		info.alignment = 1 << PAGE_SHIFT;
+#else
 		info.alignment = robj->tbo.page_alignment << PAGE_SHIFT;
+#endif
 		info.domains = robj->preferred_domains;
 		info.domain_flags = robj->flags;
 		amdgpu_bo_unreserve(robj);
