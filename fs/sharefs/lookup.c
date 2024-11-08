@@ -288,6 +288,7 @@ out:
 struct dentry *sharefs_lookup(struct inode *dir, struct dentry *dentry,
 			     unsigned int flags)
 {
+	sharefs_info("[tllookup] sharefs_setattr start");
 	int err;
 	struct dentry *ret, *parent;
 	struct path lower_parent_path;

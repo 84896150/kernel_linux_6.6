@@ -381,6 +381,9 @@ EXPORT_SYMBOL(may_setattr);
 int notify_change(struct mnt_idmap *idmap, struct dentry *dentry,
 		  struct iattr *attr, struct inode **delegated_inode)
 {
+	if (strstr(dentry->d_name.name, "DocumentViewPicker02.txt")) {
+		printk(KERN_INFO "[ltl] dentry magic: %lu", dentry->d_sb->s_magic);
+	}
 	struct inode *inode = dentry->d_inode;
 	umode_t mode = inode->i_mode;
 	int error;
