@@ -1311,6 +1311,11 @@ static long ffs_epfile_ioctl(struct file *file, unsigned code, unsigned long val
                 return 0;
             }
         }
+        if (epfile->ep->req->buf == (void *)(ffsm->mem + myIoData.buf - ffsm->vm_start)) {
+            usb_ep_dequeue(epfile->ep->ep, epfile->ep->req);
+            spin_unlock_irq(&epfile->ffs->eps_lock);
+            return 0;
+        }
         spin_unlock_irq(&epfile->ffs->eps_lock);
         return -EFAULT;
     }
