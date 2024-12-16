@@ -311,6 +311,10 @@ struct pwm_chip {
 /* PWM user APIs */
 int pwm_apply_might_sleep(struct pwm_device *pwm, const struct pwm_state *state);
 int pwm_adjust_config(struct pwm_device *pwm);
+static inline int pwm_apply_state(struct pwm_device *pwm, const struct pwm_state *state)
+{
+	return pwm_apply_might_sleep(pwm, state);
+}
 
 /**
  * pwm_config() - change a PWM device configuration
