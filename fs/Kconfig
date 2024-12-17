@@ -51,7 +51,6 @@ source "fs/btrfs/Kconfig"
 source "fs/nilfs2/Kconfig"
 source "fs/f2fs/Kconfig"
 source "fs/zonefs/Kconfig"
-source "fs/proc/memory_security/Kconfig"
 
 endif # BLOCK
 
@@ -128,8 +127,6 @@ config FILE_LOCKING
           call. Disabling this option saves about 11k.
 
 source "fs/crypto/Kconfig"
-
-source "fs/code_sign/Kconfig"
 
 source "fs/verity/Kconfig"
 

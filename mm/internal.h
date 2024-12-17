@@ -14,7 +14,9 @@
 #include <linux/rmap.h>
 #include <linux/tracepoint-defs.h>
 #include <linux/types.h>
+#ifdef CONFIG_RECLAIM_ACCT
 #include <linux/reclaim_acct.h>
+#endif
 
 struct folio_batch;
 

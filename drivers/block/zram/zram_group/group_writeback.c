@@ -8,7 +8,9 @@
 #include <linux/mm.h>
 #include <linux/memcontrol.h>
 #include <linux/blk_types.h>
+#ifdef CONFIG_HYPERHOLD_ZSWAPD
 #include <linux/zswapd.h>
+#endif
 
 #include "../zram_drv.h"
 #include "zram_group.h"

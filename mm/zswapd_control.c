@@ -11,7 +11,9 @@
 #include <linux/cgroup.h>
 #include <linux/memcg_policy.h>
 #include <linux/file.h>
+#ifdef CONFIG_HYPERHOLD_ZSWAPD
 #include <linux/zswapd.h>
+#endif
 
 #include "zswapd_internal.h"
 

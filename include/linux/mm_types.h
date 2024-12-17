@@ -19,7 +19,9 @@
 #include <linux/workqueue.h>
 #include <linux/seqlock.h>
 #include <linux/percpu_counter.h>
+#ifdef CONFIG_SECURITY_XPM
 #include <linux/xpm_types.h>
+#endif
 
 #include <asm/mmu.h>
 

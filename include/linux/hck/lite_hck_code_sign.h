@@ -6,7 +6,9 @@
 #ifndef LITE_HCK_CODE_SIGN_H
 #define LITE_HCK_CODE_SIGN_H
 
+#ifdef CONFIG_SECURITY_XPM  
 #include <linux/xpm_types.h>
+#endif
 #include <linux/hck/lite_vendor_hooks.h>
 
 #ifndef CONFIG_HCK

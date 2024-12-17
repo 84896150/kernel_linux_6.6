@@ -282,6 +282,7 @@ static DEFINE_PER_CPU(unsigned long, watchdog_touch_ts);
 static DEFINE_PER_CPU(unsigned long, watchdog_report_ts);
 static DEFINE_PER_CPU(struct hrtimer, watchdog_hrtimer);
 static DEFINE_PER_CPU(bool, softlockup_touch_sync);
+static DEFINE_PER_CPU(unsigned int, watchdog_en);
 static unsigned long soft_lockup_nmi_warn;
 
 static int __init softlockup_panic_setup(char *str)

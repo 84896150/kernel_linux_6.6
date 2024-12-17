@@ -12,7 +12,9 @@
 
 #include <linux/fsverity.h>
 #include <linux/code_sign.h>
+#ifdef CONFIG_SECURITY_XPM
 #include <linux/xpm_types.h>
+#endif
 
 /*
  * Implementation limit: maximum depth of the Merkle tree.  For now 8 is plenty;
