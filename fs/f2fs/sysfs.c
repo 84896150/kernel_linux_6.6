@@ -37,6 +37,9 @@ enum {
 	FAULT_INFO_TYPE,	/* struct f2fs_fault_info */
 #endif
 	RESERVED_BLOCKS,	/* struct f2fs_sb_info */
+#ifdef CONFIG_F2FS_GRADING_SSR
+	F2FS_HOT_COLD_PARAMS,	/* struct f2fs_hot_cold_params */
+#endif
 	CPRC_INFO,	/* struct ckpt_req_control */
 	ATGC_INFO,	/* struct atgc_management */
 };
@@ -76,6 +79,10 @@ static unsigned char *__struct_ptr(struct f2fs_sb_info *sbi, int struct_type)
 		return (unsigned char *)NM_I(sbi);
 	else if (struct_type == F2FS_SBI || struct_type == RESERVED_BLOCKS)
 		return (unsigned char *)sbi;
+#ifdef CONFIG_F2FS_GRADING_SSR
+	else if (struct_type == F2FS_HOT_COLD_PARAMS)
+		return (unsigned char *)&sbi->hot_cold_params;
+#endif
 #ifdef CONFIG_F2FS_FAULT_INJECTION
 	else if (struct_type == FAULT_INFO_RATE ||
 					struct_type == FAULT_INFO_TYPE)
@@ -898,6 +905,9 @@ static struct f2fs_attr f2fs_attr_##name = __ATTR(name, 0444, name##_show, NULL)
 	F2FS_RW_ATTR(type, f2fs_fault_info, elname, elname)
 #endif
 
+#define F2FS_HOT_COLD_PARAMS_RW_ATTR(name, elname)			\
+	F2FS_RW_ATTR(F2FS_HOT_COLD_PARAMS, f2fs_hot_cold_params, name, elname)
+
 #define RESERVED_BLOCKS_GENERAL_RW_ATTR(elname)			\
 	F2FS_RW_ATTR(RESERVED_BLOCKS, f2fs_sb_info, elname, elname)
 
@@ -932,6 +942,7 @@ DCC_INFO_GENERAL_RW_ATTR(discard_io_aware_gran);
 DCC_INFO_GENERAL_RW_ATTR(discard_urgent_util);
 DCC_INFO_GENERAL_RW_ATTR(discard_granularity);
 DCC_INFO_GENERAL_RW_ATTR(max_ordered_discard);
+DCC_INFO_GENERAL_RW_ATTR(discard_type)
 
 /* NM_INFO ATTR */
 NM_INFO_RW_ATTR(max_roll_forward_node_blocks, max_rf_node_blocks);
@@ -1002,6 +1013,18 @@ FAULT_INFO_GENERAL_RW_ATTR(FAULT_INFO_TYPE, inject_type);
 
 /* RESERVED_BLOCKS ATTR */
 RESERVED_BLOCKS_GENERAL_RW_ATTR(reserved_blocks);
+
+#ifdef CONFIG_F2FS_GRADING_SSR
+F2FS_HOT_COLD_PARAMS_RW_ATTR(hc_hot_data_lower_limit, hot_data_lower_limit);
+F2FS_HOT_COLD_PARAMS_RW_ATTR(hc_hot_data_waterline, hot_data_waterline);
+F2FS_HOT_COLD_PARAMS_RW_ATTR(hc_warm_data_lower_limit, warm_data_lower_limit);
+F2FS_HOT_COLD_PARAMS_RW_ATTR(hc_warm_data_waterline, warm_data_waterline);
+F2FS_HOT_COLD_PARAMS_RW_ATTR(hc_hot_node_lower_limit, hot_node_lower_limit);
+F2FS_HOT_COLD_PARAMS_RW_ATTR(hc_hot_node_waterline, hot_node_waterline);
+F2FS_HOT_COLD_PARAMS_RW_ATTR(hc_warm_node_lower_limit, warm_node_lower_limit);
+F2FS_HOT_COLD_PARAMS_RW_ATTR(hc_warm_node_waterline, warm_node_waterline);
+F2FS_HOT_COLD_PARAMS_RW_ATTR(hc_enable, enable);
+#endif
 
 /* CPRC_INFO ATTR */
 CPRC_INFO_GENERAL_RW_ATTR(ckpt_thread_ioprio);
@@ -1079,6 +1102,7 @@ static struct attribute *f2fs_attrs[] = {
 	ATTR_LIST(discard_io_aware_gran),
 	ATTR_LIST(discard_urgent_util),
 	ATTR_LIST(discard_granularity),
+	ATTR_LIST(discard_type),
 	ATTR_LIST(max_ordered_discard),
 	ATTR_LIST(pending_discard),
 	ATTR_LIST(gc_mode),
@@ -1162,6 +1186,17 @@ static struct attribute *f2fs_attrs[] = {
 	ATTR_LIST(hot_data_age_threshold),
 	ATTR_LIST(warm_data_age_threshold),
 	ATTR_LIST(last_age_weight),
+#ifdef CONFIG_F2FS_GRADING_SSR
+	ATTR_LIST(hc_hot_data_lower_limit),
+	ATTR_LIST(hc_hot_data_waterline),
+	ATTR_LIST(hc_warm_data_lower_limit),
+	ATTR_LIST(hc_warm_data_waterline),
+	ATTR_LIST(hc_hot_node_lower_limit),
+	ATTR_LIST(hc_hot_node_waterline),
+	ATTR_LIST(hc_warm_node_lower_limit),
+	ATTR_LIST(hc_warm_node_waterline),
+	ATTR_LIST(hc_enable),
+#endif
 	NULL,
 };
 ATTRIBUTE_GROUPS(f2fs);
@@ -1448,6 +1483,66 @@ static int __maybe_unused discard_plist_seq_show(struct seq_file *seq,
 	return 0;
 }
 
+static int undiscard_info_seq_show(struct seq_file *seq, void *offset)
+{
+	struct super_block *sb = seq->private;
+	struct f2fs_sb_info *sbi = F2FS_SB(sb);
+	struct dirty_seglist_info *dirty_i = DIRTY_I(sbi);
+	struct sit_info *sit_i = SIT_I(sbi);
+	unsigned int total_segs = le32_to_cpu(sbi->raw_super->segment_count_main);
+	unsigned int total = 0;
+	unsigned int i, j;
+	unsigned int max_blocks = sbi->blocks_per_seg;
+	unsigned long *dmap = SIT_I(sbi)->tmp_map;
+
+	if (!f2fs_realtime_discard_enable(sbi))
+		goto out;
+
+	for (i = 0; i < total_segs; i++) {
+		struct seg_entry *se = get_seg_entry(sbi, i);
+		unsigned int entries = SIT_VBLOCK_MAP_SIZE /
+			sizeof(unsigned long);
+		unsigned long *ckpt_map = (unsigned long *)se->ckpt_valid_map;
+		unsigned long *discard_map = (unsigned long *)se->discard_map;
+		int start = 0, end = -1;
+
+		down_write(&sit_i->sentry_lock);
+		if (se->valid_blocks == max_blocks) {
+			up_write(&sit_i->sentry_lock);
+			continue;
+		}
+
+		if (se->valid_blocks == 0) {
+			mutex_lock(&dirty_i->seglist_lock);
+			if (test_bit((int)i, dirty_i->dirty_segmap[PRE]))
+				total += 512;
+			mutex_unlock(&dirty_i->seglist_lock);
+		} else {
+			for (j = 0; j < entries; j++)
+				dmap[j] = ~ckpt_map[j] & ~discard_map[j];
+			while (1) {
+				start = (int)find_rev_next_bit(dmap,
+					(unsigned long)max_blocks,
+					(unsigned long)(end + 1));
+
+				if ((unsigned int)start >= max_blocks)
+					break;
+
+				end = (int)find_rev_next_zero_bit(dmap,
+					(unsigned long)max_blocks,
+					(unsigned long)(start + 1));
+				total += (unsigned int)(end - start);
+			}
+		}
+
+		up_write(&sit_i->sentry_lock);
+	}
+
+out:
+	seq_printf(seq, "total undiscard:%u K\n", total * 4);
+	return 0;
+}
+
 int __init f2fs_init_sysfs(void)
 {
 	int ret;
@@ -1527,6 +1622,8 @@ int f2fs_register_sysfs(struct f2fs_sb_info *sbi)
 #endif
 	proc_create_single_data("victim_bits", 0444, sbi->s_proc,
 				victim_bits_seq_show, sb);
+	proc_create_single_data("undiscard_info", S_IRUGO, sbi->s_proc,
+				undiscard_info_seq_show, sb);
 	proc_create_single_data("discard_plist_info", 0444, sbi->s_proc,
 				discard_plist_seq_show, sb);
 	return 0;

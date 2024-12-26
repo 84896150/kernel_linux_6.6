@@ -338,11 +338,17 @@ struct discard_entry {
 #define DEFAULT_DISCARD_GRANULARITY		16
 /* default maximum discard granularity of ordered discard, unit: block count */
 #define DEFAULT_MAX_ORDERED_DISCARD_GRANULARITY	16
+#define DISCARD_GRAN_BL		16
+#define DISCARD_GRAN_BG		512
+#define DISCARD_GRAN_FORCE	1
 
 /* max discard pend list number */
 #define MAX_PLIST_NUM		512
 #define plist_idx(blk_num)	((blk_num) >= MAX_PLIST_NUM ?		\
 					(MAX_PLIST_NUM - 1) : ((blk_num) - 1))
+#define FS_FREE_SPACE_PERCENT		20
+#define DEVICE_FREE_SPACE_PERCENT	10
+#define HUNDRED_PERCENT			100
 
 enum {
 	D_PREP,			/* initial */
@@ -373,10 +379,23 @@ struct discard_cmd {
 
 enum {
 	DPOLICY_BG,
+	DPOLICY_BALANCE,
 	DPOLICY_FORCE,
 	DPOLICY_FSTRIM,
 	DPOLICY_UMOUNT,
 	MAX_DPOLICY,
+};
+
+enum {
+	SUB_POLICY_BIG,
+	SUB_POLICY_MID,
+	SUB_POLICY_SMALL,
+	NR_SUB_POLICY,
+};
+
+struct discard_sub_policy {
+	unsigned int max_requests;
+	int interval;
 };
 
 struct discard_policy {
@@ -384,13 +403,13 @@ struct discard_policy {
 	unsigned int min_interval;	/* used for candidates exist */
 	unsigned int mid_interval;	/* used for device busy */
 	unsigned int max_interval;	/* used for candidates not exist */
-	unsigned int max_requests;	/* # of discards issued per round */
 	unsigned int io_aware_gran;	/* minimum granularity discard not be aware of I/O */
 	bool io_aware;			/* issue discard in idle time */
 	bool sync;			/* submit discard with REQ_SYNC flag */
 	bool ordered;			/* issue discard by lba order */
 	bool timeout;			/* discard timeout for put_super */
 	unsigned int granularity;	/* discard granularity */
+	struct discard_sub_policy sub_policy[NR_SUB_POLICY];
 };
 
 struct discard_cmd_control {
@@ -1544,6 +1563,20 @@ struct decompress_io_ctx {
 #define MAX_COMPRESS_LOG_SIZE		8
 #define MAX_COMPRESS_WINDOW_SIZE(log_size)	((PAGE_SIZE) << (log_size))
 
+#ifdef CONFIG_F2FS_GRADING_SSR
+struct f2fs_hot_cold_params {
+	unsigned int enable;
+	unsigned int hot_data_lower_limit;
+	unsigned int hot_data_waterline;
+	unsigned int warm_data_lower_limit;
+	unsigned int warm_data_waterline;
+	unsigned int hot_node_lower_limit;
+	unsigned int hot_node_waterline;
+	unsigned int warm_node_lower_limit;
+	unsigned int warm_node_waterline;
+};
+#endif
+
 struct f2fs_sb_info {
 	struct super_block *sb;			/* pointer to VFS super block */
 	struct proc_dir_entry *s_proc;		/* proc entry */
@@ -1810,6 +1843,10 @@ struct f2fs_sb_info {
 	/* For io latency related statistics info in one iostat period */
 	spinlock_t iostat_lat_lock;
 	struct iostat_lat_info *iostat_io_lat;
+#endif
+
+#ifdef CONFIG_F2FS_GRADING_SSR
+	struct f2fs_hot_cold_params hot_cold_params;
 #endif
 };
 
@@ -3454,6 +3491,18 @@ static inline __le32 *get_dnode_addr(struct inode *inode,
 
 #define __is_meta_io(fio) (PAGE_TYPE_OF_BIO((fio)->type) == META)
 
+static inline block_t fs_free_space_threshold(struct f2fs_sb_info *sbi)
+{
+	return (block_t)(SM_I(sbi)->main_segments * sbi->blocks_per_seg *
+		FS_FREE_SPACE_PERCENT) / HUNDRED_PERCENT;
+}
+
+static inline block_t device_free_space_threshold(struct f2fs_sb_info *sbi)
+{
+	return (block_t)(SM_I(sbi)->main_segments * sbi->blocks_per_seg *
+		DEVICE_FREE_SPACE_PERCENT) / HUNDRED_PERCENT;
+}
+
 bool f2fs_is_valid_blkaddr(struct f2fs_sb_info *sbi,
 					block_t blkaddr, int type);
 static inline void verify_blkaddr(struct f2fs_sb_info *sbi,
@@ -3658,6 +3707,10 @@ void f2fs_destroy_node_manager_caches(void);
 /*
  * segment.c
  */
+unsigned long find_rev_next_bit(const unsigned long *addr,
+		unsigned long size, unsigned long offset);
+unsigned long find_rev_next_zero_bit(const unsigned long *addr,
+		unsigned long size, unsigned long offset);
 bool f2fs_need_SSR(struct f2fs_sb_info *sbi);
 int f2fs_commit_atomic_write(struct inode *inode);
 void f2fs_abort_atomic_write(struct inode *inode, bool clean);
@@ -3714,7 +3767,7 @@ void f2fs_replace_block(struct f2fs_sb_info *sbi, struct dnode_of_data *dn,
 void f2fs_allocate_data_block(struct f2fs_sb_info *sbi, struct page *page,
 			block_t old_blkaddr, block_t *new_blkaddr,
 			struct f2fs_summary *sum, int type,
-			struct f2fs_io_info *fio);
+			struct f2fs_io_info *fio, int contig_level);
 void f2fs_update_device_state(struct f2fs_sb_info *sbi, nid_t ino,
 					block_t blkaddr, unsigned int blkcnt);
 void f2fs_wait_on_page_writeback(struct page *page,
