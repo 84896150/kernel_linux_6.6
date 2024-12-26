@@ -21,8 +21,10 @@
 #include <linux/vmstat.h>
 #include <linux/writeback.h>
 #include <linux/page-flags.h>
+#ifdef CONFIG_HYPERHOLD_MEMCG
 #include <linux/memcg_policy.h>
 #include <linux/pagemap.h>
+#endif
 
 struct mem_cgroup;
 struct obj_cgroup;

@@ -46,7 +46,9 @@
 #include <asm/tlbflush.h>
 #include <linux/swapops.h>
 #include <linux/swap_cgroup.h>
+#ifdef CONFIG_HYPERHOLD_ZSWAPD
 #include <linux/zswapd.h>
+#endif
 #include "internal.h"
 #include "swap.h"
 

@@ -512,8 +512,8 @@ PAGEFLAG(Checked, checked, PF_NO_COMPOUND)	   /* Used by some filesystems */
 PAGEFLAG(XPMReadonly, xpm_readonly, PF_HEAD)
 PAGEFLAG(XPMWritetainted, xpm_writetainted, PF_HEAD)
 #else
-PAGEFLAG_FALSE(XPMReadonly)
-PAGEFLAG_FALSE(XPMWritetainted)
+PAGEFLAG_FALSE(XPMReadonly, xpmreadonly)
+PAGEFLAG_FALSE(XPMWritetainted, xpmwritetainted)
 #endif
 
 /* Xen */
@@ -641,7 +641,7 @@ PAGEFLAG_FALSE(VmemmapSelfHosted, vmemmap_self_hosted)
 #ifdef CONFIG_MEM_PURGEABLE
 PAGEFLAG(Purgeable, purgeable, PF_ANY)
 #else
-PAGEFLAG_FALSE(Purgeable)
+PAGEFLAG_FALSE(Purgeable, purgeable)
 #endif
 
 /*

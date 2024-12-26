@@ -35,7 +35,9 @@
 #include <linux/compaction.h>
 #include <linux/rmap.h>
 #include <linux/module.h>
+#ifdef CONFIG_HYPERHOLD_ZSWAPD
 #include <linux/zswapd.h>
+#endif
 
 #include <asm/tlbflush.h>
 

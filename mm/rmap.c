@@ -75,7 +75,9 @@
 #include <linux/memremap.h>
 #include <linux/userfaultfd_k.h>
 #include <linux/mm_inline.h>
+#ifdef CONFIG_MEM_PURGEABLE
 #include <linux/mm_purgeable.h>
+#endif
 
 #include <asm/tlbflush.h>
 

@@ -71,7 +71,9 @@
 #include "swap.h"
 
 #include <linux/uaccess.h>
+#ifdef CONFIG_HYPERHOLD_ZSWAPD
 #include <linux/zswapd.h>
+#endif
 
 #include <trace/events/vmscan.h>
 

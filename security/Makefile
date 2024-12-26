@@ -4,7 +4,9 @@
 #
 
 obj-$(CONFIG_KEYS)			+= keys/
+ifdef CONFIG_SECURITY_CONTAINER_ESCAPE_DETECTION
 subdir-$(CONFIG_SECURITY_CONTAINER_ESCAPE_DETECTION) += container_escape_detection
+endif
 
 # always enable default capabilities
 obj-y					+= commoncap.o
@@ -24,9 +26,13 @@ obj-$(CONFIG_SECURITY_SAFESETID)       += safesetid/
 obj-$(CONFIG_SECURITY_LOCKDOWN_LSM)	+= lockdown/
 obj-$(CONFIG_CGROUPS)			+= device_cgroup.o
 obj-$(CONFIG_BPF_LSM)			+= bpf/
+ifdef CONFIG_SECURITY_XPM
 obj-$(CONFIG_SECURITY_XPM)		+= xpm/
+endif
 obj-$(CONFIG_SECURITY_LANDLOCK)		+= landlock/
+ifdef CONFIG_SECURITY_CONTAINER_ESCAPE_DETECTION
 obj-$(CONFIG_SECURITY_CONTAINER_ESCAPE_DETECTION) += container_escape_detection/
+endif
 
 # Object integrity file lists
 obj-$(CONFIG_INTEGRITY)			+= integrity/

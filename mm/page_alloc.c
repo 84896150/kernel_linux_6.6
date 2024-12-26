@@ -51,7 +51,9 @@
 #include <linux/lockdep.h>
 #include <linux/psi.h>
 #include <linux/khugepaged.h>
+#ifdef CONFIG_HYPERHOLD_ZSWAPD
 #include <linux/zswapd.h>
+#endif
 #ifdef CONFIG_RECLAIM_ACCT
 #include <linux/reclaim_acct.h>
 #endif

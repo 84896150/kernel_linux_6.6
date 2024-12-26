@@ -34,4 +34,6 @@ proc-$(CONFIG_PROC_VMCORE)	+= vmcore.o
 proc-$(CONFIG_PRINTK)	+= kmsg.o
 proc-$(CONFIG_PROC_PAGE_MONITOR)	+= page.o
 proc-$(CONFIG_BOOT_CONFIG)	+= bootconfig.o
-obj-$(CONFIG_MEMORY_SECURITY) += memory_security/
+ifdef CONFIG_MEMORY_SECURITY
+	obj-$(CONFIG_MEMORY_SECURITY) += memory_security/
+endif
