@@ -10,6 +10,7 @@
 #include <asm/loongson.h>
 #include <asm/sections.h>
 #include "legacy_boot.h"
+unsigned long long g_vram = 0;
 void __init memblock_init(void)
 {
 	u32 i, mem_type;
@@ -43,6 +44,12 @@ void __init memblock_init(void)
 		mem_type = md->type;
 		mem_start = md->phys_addr;
 		mem_size = md->num_pages << EFI_PAGE_SHIFT;
+		if((mem_type == EFI_CONVENTIONAL_MEMORY) && (mem_size > 0x20000000))
+		{
+			md->num_pages -= (0x10000000 >> EFI_PAGE_SHIFT);
+			g_vram = mem_start + (md->num_pages << EFI_PAGE_SHIFT);
+			mem_size = md->num_pages << EFI_PAGE_SHIFT;
+		}
 		mem_end = mem_start + mem_size;
 
 		switch (mem_type) {
