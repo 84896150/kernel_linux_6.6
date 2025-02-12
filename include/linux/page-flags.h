@@ -641,7 +641,7 @@ PAGEFLAG_FALSE(VmemmapSelfHosted, vmemmap_self_hosted)
 #ifdef CONFIG_MEM_PURGEABLE
 PAGEFLAG(Purgeable, purgeable, PF_ANY)
 #else
-PAGEFLAG_FALSE(Purgeable)
+PAGEFLAG_FALSE(Purgeable, purgeable)
 #endif
 
 /*
