@@ -1,124 +1,92 @@
 // SPDX-License-Identifier: GPL-2.0
 /*
- * mm/lowmem_dbg.c
+ * mm/lmkd_dbg_trigger.c
  *
  * Copyright (c) 2020-2022 Huawei Technologies Co., Ltd.
  */
-#define pr_fmt(fmt) "lowmem:" fmt
-
-#include <linux/module.h>
-#include <linux/kernel.h>
-#include <linux/mm.h>
-#include <linux/oom.h>
-#include <linux/sched.h>
-#include <linux/rcupdate.h>
-#include <linux/notifier.h>
-#include <linux/mutex.h>
-#include <linux/delay.h>
-#include <linux/swap.h>
+#include <linux/atomic.h>
 #include <linux/fs.h>
-#include <linux/jiffies.h>
-#include <linux/workqueue.h>
-#include <linux/freezer.h>
-#include <linux/ksm.h>
-#include <linux/io.h>
-#include <linux/version.h>
+#include <linux/init.h>
+#include <linux/kernel.h>
+#include <linux/module.h>
+#include <linux/oom.h>
+#include <linux/proc_fs.h>
+#include <linux/seq_file.h>
+#include <linux/uaccess.h>
 #include <linux/lowmem_dbg.h>
+#define PROC_NUMBUF 8
 
-#define LMK_PRT_TSK_RSS 10000
-#define LMK_INTERVAL 3
+static int lmkd_oom_score_adj;
+static atomic64_t lmkd_no_cma_cnt = ATOMIC64_INIT(0);
 
-/* SERVICE_ADJ(5) * OOM_SCORE_ADJ_MAX / -OOM_DISABLE */
-#define LMK_SERVICE_ADJ 500
-/* defiine TASK STATE String */
-#define TASK_STATE_TO_CHAR_STR "RSDTtXZxKWPNn"
-
-static unsigned long long last_jiffs;
-static const char state_to_char[] = TASK_STATE_TO_CHAR_STR;
-static void lowmem_dump(struct work_struct *work);
-
-static DEFINE_MUTEX(lowmem_dump_mutex);
-static DECLARE_WORK(lowmem_dbg_wk, lowmem_dump);
-static DECLARE_WORK(lowmem_dbg_verbose_wk, lowmem_dump);
-
-static int task_state_char(unsigned long state)
+void lmkd_inc_no_cma_cnt(void)
 {
-	int bit = state ? __ffs(state) + 1 : 0;
-
-	return bit < sizeof(state_to_char) - 1 ? state_to_char[bit] : '?';
+	atomic64_inc(&lmkd_no_cma_cnt);
 }
 
-static void tasks_dump(bool verbose)
+void lmkd_dec_no_cma_cnt(void)
 {
-	struct task_struct *p = NULL;
-	struct task_struct *task = NULL;
-	short tsk_oom_adj = 0;
-	unsigned long tsk_nr_ptes = 0;
-	char frozen_mark = ' ';
+	atomic64_dec(&lmkd_no_cma_cnt);
+}
 
-	pr_info("[ pid ]    uid  tgid total_vm    rss nptes  swap   adj s name\n");
+static int lmkd_dbg_trigger_proc_show(struct seq_file *m, void *v)
+{
+	seq_printf(m, "lmkd_oom_score_adj: %d\n", lmkd_oom_score_adj);
+	seq_printf(m, "lmkd_no_cma_cnt: %lld\n",
+		atomic64_read(&lmkd_no_cma_cnt));
+	return 0;
+}
 
-	rcu_read_lock();
-	for_each_process(p) {
-		task = find_lock_task_mm(p);
-		if (!task) {
-			/*
-			 * This is a kthread or all of p's threads have already
-			 * detached their mm's. There's no need to report
-			 * them; they can't be oom killed anyway.
-			 */
-			continue;
-		}
+static int lmkd_dbg_trigger_proc_open(struct inode *inode, struct file *file)
+{
+	return single_open(file, lmkd_dbg_trigger_proc_show, NULL);
+}
 
-		tsk_oom_adj = task->signal->oom_score_adj;
-		if (!verbose && tsk_oom_adj &&
-		    (tsk_oom_adj <= LMK_SERVICE_ADJ) &&
-		    (get_mm_rss(task->mm) < LMK_PRT_TSK_RSS)) {
-			task_unlock(task);
-			continue;
-		}
+static ssize_t lmkd_dbg_trigger_write(struct file *file, const char __user *buf,
+	       size_t count, loff_t *ppos)
+{
+	char buffer[PROC_NUMBUF];
+	int oom_score_adj;
+	int err;
 
-		tsk_nr_ptes = mm_pgtables_bytes(task->mm);
-
-		frozen_mark = frozen(task) ? '*' : ' ';
-
-		pr_info("[%5d] %5d %5d %8lu %6lu %5lu %5lu %5hd %c %s%c\n",
-		    task->pid, from_kuid(&init_user_ns, task_uid(task)),
-		    task->tgid, task->mm->total_vm, get_mm_rss(task->mm),
-		    tsk_nr_ptes,
-		    get_mm_counter(task->mm, MM_SWAPENTS),
-		    tsk_oom_adj,
-		    task_state_char(task->state),
-		    task->comm,
-		    frozen_mark); /*lint !e1058*/
-		task_unlock(task);
+	memset(buffer, 0, sizeof(buffer));
+	if (count > sizeof(buffer) - 1)
+		count = sizeof(buffer) - 1;
+	if (copy_from_user(buffer, buf, count)) {
+		err = -EFAULT;
+		goto out;
 	}
-	rcu_read_unlock();
-}
 
-static void lowmem_dump(struct work_struct *work)
-{
-	bool verbose = (work == &lowmem_dbg_verbose_wk) ? true : false;
+	err = kstrtoint(strstrip(buffer), 0, &oom_score_adj);
+	if (err)
+		goto out;
 
-	mutex_lock(&lowmem_dump_mutex);
-#if defined(SHOW_MEM_FILTER_PAGE_COUNT)
-	show_mem(SHOW_MEM_FILTER_NODES |
-	    (verbose ? 0 : SHOW_MEM_FILTER_PAGE_COUNT));
-#else
-	show_mem(SHOW_MEM_FILTER_NODES, NULL);
-#endif
-	tasks_dump(verbose);
-	mutex_unlock(&lowmem_dump_mutex);
-}
-
-void lowmem_dbg(short oom_score_adj)
-{
-	unsigned long long jiffs = get_jiffies_64();
-
-	if (oom_score_adj == 0) {
-		schedule_work(&lowmem_dbg_verbose_wk);
-	} else if (time_after64(jiffs, (last_jiffs + LMK_INTERVAL * HZ))) {
-		last_jiffs = get_jiffies_64();
-		schedule_work(&lowmem_dbg_wk);
+	if (oom_score_adj < OOM_SCORE_ADJ_MIN ||
+		oom_score_adj > OOM_SCORE_ADJ_MAX) {
+		err = -EINVAL;
+		goto out;
 	}
+
+	lmkd_oom_score_adj = oom_score_adj;
+	lowmem_dbg(oom_score_adj);
+
+out:
+	return err < 0 ? err : count;
 }
+
+static const struct proc_ops lmkd_dbg_trigger_proc_fops = {
+	.proc_open		= lmkd_dbg_trigger_proc_open,
+	.proc_read		= seq_read,
+	.proc_lseek		= seq_lseek,
+	.proc_release		= single_release,
+	.proc_write		= lmkd_dbg_trigger_write,
+};
+
+static int __init proc_lmkd_dbg_trigger_init(void)
+{
+	proc_create("lmkd_dbg_trigger", 0660, NULL,
+			&lmkd_dbg_trigger_proc_fops);
+	return 0;
+}
+
+fs_initcall(proc_lmkd_dbg_trigger_init);
