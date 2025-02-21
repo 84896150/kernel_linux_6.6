@@ -1461,6 +1461,7 @@ static long usbfn_ioctl(struct file *file, unsigned int cmd, unsigned long value
 {
     long ret;
     ENTER();
+    pr_err("[yml][%s:%d] usbfn_ioctl\n", __FUNCTION__, __LINE__);
     switch(cmd)
     {
         case FUNCTIONFS_NEWFN:
@@ -3541,6 +3542,7 @@ static int ffs_func_get_alt(struct usb_function *f, unsigned intf)
 static struct usb_function *ffs_alloc(struct usb_function_instance *fi)
 {
     struct ffs_function *func = NULL;
+    pr_err("[yml][%s:%d] ffs_alloc\n", __FUNCTION__, __LINE__);
 
     ENTER();
 

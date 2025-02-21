@@ -1766,6 +1766,12 @@ static int fill_ext_prop(struct usb_configuration *c, int interface, u8 *buf)
 	return count;
 }
 
+#ifdef CONFIG_USB_CONFIGFS_F_ACC
+extern int acc_ctrlrequest_composite(struct usb_composite_dev *cdev,
+				const struct usb_ctrlrequest *ctrl);
+void acc_disconnect(void);
+#endif
+
 /*
  * The setup() callback implements all the ep0 functionality that's
  * not handled lower down, in hardware or the hardware driver(like
@@ -1787,6 +1793,9 @@ composite_setup(struct usb_gadget *gadget, const struct usb_ctrlrequest *ctrl)
 	struct usb_function		*f = NULL;
 	struct usb_function		*iter;
 	u8				endp;
+
+	pr_err("[yml][%s:%d] %02x.%02x v%04x i%04x l%u\n", __FUNCTION__, __LINE__,
+		ctrl->bRequestType, ctrl->bRequest, w_value, w_index, w_length);
 
 	if (w_length > USB_COMP_EP0_BUFSIZ) {
 		if (ctrl->bRequestType & USB_DIR_IN) {
@@ -2212,6 +2221,14 @@ unknown:
 			goto check_value;
 		}
 
+#ifdef CONFIG_USB_CONFIGFS_F_ACC
+		value = acc_ctrlrequest_composite(cdev, ctrl);
+		pr_err("[yml][%s:%d] acc_ctrlrequest_composite match result:%d\n", __FUNCTION__, __LINE__, value);
+		if (value >= 0) {
+			goto done;
+		}
+#endif
+
 		VDBG(cdev,
 			"non-core control req%02x.%02x v%04x i%04x l%d\n",
 			ctrl->bRequestType, ctrl->bRequest,
@@ -2289,10 +2306,12 @@ check_value:
 		req->length = value;
 		req->context = cdev;
 		req->zero = value < w_length;
+		pr_err("[yml][%s:%d] check_value:%d\n", __FUNCTION__, __LINE__, value);
 		value = composite_ep0_queue(cdev, req, GFP_ATOMIC);
 		if (value < 0) {
 			DBG(cdev, "ep_queue --> %d\n", value);
 			req->status = 0;
+			pr_err("[yml][%s:%d] check_value:%d\n", __FUNCTION__, __LINE__, value);
 			composite_setup_complete(gadget->ep0, req);
 		}
 	} else if (value == USB_GADGET_DELAYED_STATUS && w_length != 0) {
@@ -2303,6 +2322,7 @@ check_value:
 
 done:
 	/* device either stalls (value < 0) or reports success */
+	pr_err("[yml][%s:%d] done:%d\n", __FUNCTION__, __LINE__, value);
 	return value;
 }
 
