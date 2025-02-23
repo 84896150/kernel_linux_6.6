@@ -98,6 +98,9 @@
 #include <linux/jump_label.h>
 #include <linux/kcsan.h>
 #include <linux/init_syscalls.h>
+#ifdef CONFIG_RECLAIM_ACCT
+#include <linux/reclaim_acct.h>
+#endif
 #include <linux/stackdepot.h>
 #include <linux/randomize_kstack.h>
 #include <net/net_namespace.h>
@@ -1065,6 +1068,9 @@ void start_kernel(void)
 	cgroup_init();
 	taskstats_init_early();
 	delayacct_init();
+#ifdef CONFIG_RECLAIM_ACCT
+	reclaimacct_init();
+#endif
 
 	acpi_subsystem_init();
 	arch_post_acpi_subsys_init();

@@ -1371,3 +1371,28 @@ struct vma_prepare {
 	struct vm_area_struct *remove2;
 };
 #endif	/* __MM_INTERNAL_H */
+
+#ifdef CONFIG_RECLAIM_ACCT
+#define DELAY_LV0 5000000 /* 5ms */
+#define DELAY_LV1 10000000 /* 10ms */
+#define DELAY_LV2 50000000 /* 50ms */
+#define DELAY_LV3 100000000 /* 100ms */
+#define DELAY_LV4 2000000000 /* 2000ms */
+#define DELAY_LV5 50000000000 /* 50000ms */
+#define NR_DELAY_LV 6
+
+struct reclaim_acct {
+	u64 start[NR_RA_STUBS];
+	u64 delay[NR_RA_STUBS];
+	u64 count[NR_RA_STUBS];
+	u64 freed[NR_RA_STUBS];
+	unsigned int reclaim_type;
+};
+
+bool reclaimacct_initialize_show_data(void);
+void reclaimacct_reinitialize_show_data(void);
+void reclaimacct_destroy_show_data(void);
+
+void reclaimacct_collect_data(void);
+void reclaimacct_collect_reclaim_efficiency(void);
+#endif

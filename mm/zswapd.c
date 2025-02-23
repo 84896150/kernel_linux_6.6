@@ -535,7 +535,6 @@ static unsigned long zswapd_shrink_list(enum lru_list lru,
 {
 #ifdef CONFIG_RECLAIM_ACCT
 	unsigned long nr_reclaimed;
-
 	reclaimacct_substage_start(RA_SHRINKANON);
 #endif
 	if (is_active_lru(lru)) {
@@ -566,7 +565,9 @@ static void zswapd_shrink_anon_memcg(struct pglist_data *pgdat,
 	unsigned long nr_to_scan;
 	struct blk_plug plug;
 	enum lru_list lru;
-
+#ifdef CONFIG_RECLAIM_ACCT
+	struct reclaim_acct ra = {0};
+#endif
 	blk_start_plug(&plug);
 
 	while (nr[LRU_INACTIVE_ANON] || nr[LRU_ACTIVE_ANON]) {
