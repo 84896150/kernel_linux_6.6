@@ -71,6 +71,9 @@ ifdef CONFIG_MMU
 	obj-$(CONFIG_ADVISE_SYSCALLS)	+= madvise.o
 endif
 
+obj-$(CONFIG_LMKD_DBG) += lmkd_dbg_trigger.o
+obj-$(CONFIG_LOWMEM) += lowmem_dbg.o
+obj-$(CONFIG_RSS_THRESHOLD) += rss_threshold.o
 obj-$(CONFIG_SWAP)	+= page_io.o swap_state.o swapfile.o swap_slots.o
 obj-$(CONFIG_ZSWAP)	+= zswap.o
 obj-$(CONFIG_HAS_DMA)	+= dmapool.o
