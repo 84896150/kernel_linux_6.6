@@ -754,27 +754,35 @@ static long ffs_ep0_ioctl(struct file *file, unsigned code, unsigned long value)
     case FUNCTIONFS_ENDPOINT_READ:
     case FUNCTIONFS_ENDPOINT_WRITE:
     {
+        pr_info("mgj -----------2000------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
         struct IoData myIoData;
         struct ffs_io_data io_data, *p = &io_data;
         ret = copy_from_user(&myIoData, (void __user *)value, sizeof(struct IoData));
+        pr_info("mgj -----------2001------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
         if (unlikely(ret)) {
+            pr_info("mgj -----------2005------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
             return -EFAULT;
         }
         if (myIoData.aio) {
             p = kmalloc(sizeof(io_data), GFP_KERNEL);
-            if (unlikely(!p))
+            if (unlikely(!p)) {
+                pr_info("mgj -----------2006------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
                 return -ENOMEM;
+            }
         } else {
             memset(p, 0, sizeof(*p));
         }
+        pr_info("mgj -----------2002------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
         memcpy(p, &myIoData, sizeof(struct IoData));
         
+        pr_info("mgj -----------2003------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
         ret = ffs_ep0_iorw(file, p);
         if (ret == -EIOCBQUEUED) {
             return 0;
         }
         if (p->aio)
             kfree(p);
+        pr_info("mgj -----------2004------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
         return ret;
     }
     case FUNCTIONFS_ENDPOINT_RW_CANCEL:
@@ -1261,14 +1269,20 @@ static long ffs_epfile_ioctl(struct file *file, unsigned code, unsigned long val
     {
         struct IoData myIoData;
         struct ffs_io_data io_data, *p = &io_data;
+        pr_info("mgj -----------3000------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
         ret = copy_from_user(&myIoData, (void __user *)value, sizeof(struct IoData));
+        pr_info("mgj -----------3001------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
         if (unlikely(ret)) {
+            pr_info("mgj -----------3002------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
             spin_unlock_irq(&epfile->ffs->eps_lock);
+            pr_info("mgj -----------3003------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
             return -EFAULT;
         }
         if (myIoData.aio) {
             p = kmalloc(sizeof(io_data), GFP_KERNEL);
+            pr_info("mgj -----------3004------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
             if (unlikely(!p)) {
+                pr_info("mgj -----------3004------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
                 spin_unlock_irq(&epfile->ffs->eps_lock);
                 return -ENOMEM;
             }
@@ -1276,14 +1290,17 @@ static long ffs_epfile_ioctl(struct file *file, unsigned code, unsigned long val
             memset(p,  0, sizeof(*p));
         }
         memcpy(p, &myIoData, sizeof(struct IoData));
+        pr_info("mgj -----------3005------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
 
         spin_unlock_irq(&epfile->ffs->eps_lock);
         ret = ffs_epfile_iorw(file, p);
+        pr_info("mgj -----------3006------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
         if (ret == -EIOCBQUEUED) {
             return 0;
         }
         if (p->aio)
             kfree(p);
+        pr_info("mgj -----------3007------  copy from user FUNCTIONFS_ENDPOINT_WRITE\n");
         return ret;
     }
     case FUNCTIONFS_ENDPOINT_RW_CANCEL:
