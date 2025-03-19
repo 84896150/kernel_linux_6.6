@@ -623,6 +623,10 @@ int pm_suspend(suspend_state_t state)
 		return -EINVAL;
 
 	pr_info("suspend entry (%s)\n", mem_sleep_labels[state]);
+	if (strcmp(mem_sleep_labels[state], "deep") == 0) {
+		pr_info("reject deep suspend\n");
+		return -EINVAL;
+	}
 	error = enter_state(state);
 	if (error) {
 		suspend_stats.fail++;
