@@ -12,7 +12,7 @@
 
 /* #define DEBUG */
 /* #define VERBOSE_DEBUG */
-
+#include <asm/ptrace.h>
 #include <linux/export.h>
 #include <linux/hid.h>
 #include <linux/miscdevice.h>
@@ -30,6 +30,7 @@
 #include "configfs.h"
 
 #define FUNCTIONFS_MAGIC    0xa647361 /* Chosen by a honest dice roll ;) */
+#define USB_CDC_SET_COMM_FEATURE     0x02
 
 /* Reference counter handling */
 static void ffs_data_get(struct ffs_data *ffs);
@@ -165,7 +166,7 @@ struct ffs_epfile {
 
     char                name[MAX_NAMELEN];
     dev_t                devno;
-    struct cdev         cdev;
+    struct cdev         *cdev;
     struct device         *device;
 
     unsigned char            in;    /* P: ffs->eps_lock */
@@ -175,6 +176,7 @@ struct ffs_epfile {
     wait_queue_head_t   wait_que;
 
     unsigned char            _pad;
+    atomic_t                 force_wakeup;
 };
 
 struct ffs_buffer {
@@ -198,6 +200,7 @@ struct ffs_io_data {
     struct usb_request *req;
     struct ffs_epfile *epfile;
     struct ffs_data *ffs;
+    struct work_struct work;
 };
 
 struct ffs_desc_helper {
@@ -230,7 +233,6 @@ static char *ffs_prepare_buffer(const char __user *buf, size_t len)
     __attribute__((warn_unused_result, nonnull));
 
 struct class *ffs_class;
-
 static char *ffs_devnode(const struct device *dev, umode_t *mode)
 {
     if (mode)
@@ -612,10 +614,75 @@ done_mutex:
     return ret;
 }
 
+struct ffs_data_list {
+    struct list_head list;
+    struct ffs_data *ffs_data;
+};
+
+static struct ffs_data_list ffs_data_head = { 0 };
+
+static bool map_cdev_to_ffs_data(struct ffs_data *data)
+{
+    if (data == NULL) {
+        return false;
+    }
+
+    if (ffs_data_head.list.next == NULL) {
+        INIT_LIST_HEAD(&ffs_data_head.list);
+    }
+
+    struct ffs_data_list *entry = kmalloc(sizeof(struct ffs_data_list), GFP_KERNEL);
+    if (!entry) {
+        return false;
+    }
+    entry->ffs_data = data;
+    list_add_tail(&entry->list, &ffs_data_head.list);
+    return true;
+}
+
+static bool unmap_cdev_to_ffs_data(struct ffs_data *data)
+{
+    if (data == NULL || ffs_data_head.list.next == NULL) {
+        return false;
+    }
+
+    struct ffs_data_list *data_entry = NULL, *tmp = NULL;
+    list_for_each_entry_safe(data_entry, tmp, &ffs_data_head.list, list) {
+        if (data_entry != NULL && data_entry->ffs_data == data) {
+            list_del(&data_entry->list);
+            kfree((void *)data_entry);
+            data_entry = NULL;
+            return true;
+        }
+    }
+    return false;
+}
+
+static struct ffs_data *find_ffs_data(struct cdev *cdev)
+{
+    if (ffs_data_head.list.next == NULL || cdev ==NULL) {
+        return NULL;
+    }
+
+    struct ffs_data_list *data_entry = NULL;
+    list_for_each_entry(data_entry, &ffs_data_head.list, list) {
+        if (data_entry != NULL && data_entry->ffs_data != NULL && data_entry->ffs_data->cdev == cdev) {
+            return data_entry->ffs_data;
+        }
+    }
+    return NULL;
+}
+
 static int ffs_ep0_open(struct inode *inode, struct file *file)
 {
-    struct ffs_data *ffs  = container_of(inode->i_cdev, struct ffs_data, cdev);
     ENTER();
+
+    struct ffs_data *ffs = find_ffs_data(inode->i_cdev);
+
+    if (!ffs) {
+        pr_err("[%s]ffs not found\n", __func__);
+        return -EBUSY;
+    }
 
     if (unlikely(ffs->state == FFS_CLOSING))
         return -EBUSY;
@@ -783,11 +850,19 @@ static long ffs_ep0_ioctl(struct file *file, unsigned code, unsigned long value)
         struct IoData myIoData;
         ret = copy_from_user(&myIoData, (void __user *)value, sizeof(struct IoData));
         if (unlikely(ret)) {
+            pr_err("[%s] cancel: copy from user failed\n", __func__);
             return -EFAULT;
         }
+
+        if (ffs == NULL || ffs->ep0req == NULL) {
+            pr_err("[%s] ffs or ep0req is null\n", __func__);
+            return -EFAULT;
+        }
+
         ffsm = generic_find_ep0_memory_area(ffs, myIoData.buf, myIoData.len);
         if (ffsm == NULL)
         {
+            pr_err("[%s] ffsm is null\n", __func__);
             return -EFAULT;
         }
         list_for_each_entry(req, &ffs->ep0req->list, list) {
@@ -972,9 +1047,9 @@ static void ffs_epfile_io_complete(struct usb_ep *_ep, struct usb_request *req)
     }
 }
 
-static void epfile_task_proc(unsigned long context)
+static void epfile_task_proc(struct work_struct *work)
 {
-    struct ffs_io_data *io_data = (struct ffs_io_data *)context;
+    struct ffs_io_data *io_data = container_of(work, struct ffs_io_data, work);
     struct ffs_epfile *epfile = io_data->epfile;
     unsigned long flags;
 
@@ -992,16 +1067,79 @@ static void epfile_task_proc(unsigned long context)
 static void ffs_epfile_async_io_complete(struct usb_ep *_ep, struct usb_request *req)
 {
     struct ffs_io_data *io_data = req->context;
+    struct ffs_data *ffs = io_data->ffs;
+    INIT_WORK(&io_data->work, epfile_task_proc);
+    queue_work(ffs->io_completion_wq, &io_data->work);
+}
 
-    tasklet_init(&io_data->task, epfile_task_proc, (uintptr_t)io_data);
-    tasklet_schedule(&io_data->task);
+struct ffs_epfile_list {
+    struct list_head list;
+    struct ffs_epfile *ffs_epfile;
+};
 
+static struct ffs_epfile_list ffs_epfile_head = { 0 };
+
+static bool map_cdev_to_ffs_epfile(struct ffs_epfile *data)
+{
+    if (data == NULL) {
+        return false;
+    }
+
+    if (ffs_epfile_head.list.next == NULL) {
+        INIT_LIST_HEAD(&ffs_epfile_head.list);
+    }
+
+    struct ffs_epfile_list *entry = kmalloc(sizeof(struct ffs_epfile_list), GFP_KERNEL);
+    if (!entry) {
+        return false;
+    }
+    entry->ffs_epfile = data;
+    list_add_tail(&entry->list, &ffs_epfile_head.list);
+    return true;
+}
+
+static bool unmap_cdev_to_ffs_epfile(struct ffs_epfile *data)
+{
+    if (data == NULL || ffs_epfile_head.list.next == NULL) {
+        return false;
+    }
+
+    struct ffs_epfile_list *data_entry = NULL, *tmp =NULL;
+    list_for_each_entry_safe(data_entry, tmp, &ffs_epfile_head.list, list) {
+        if (data_entry != NULL && data_entry->ffs_epfile == data) {
+            list_del(&data_entry->list);
+            kfree((void *)data_entry);
+            data_entry = NULL;
+            return true;
+        }
+    }
+    return false;
+}
+
+static struct ffs_epfile *find_ffs_epfile(struct cdev *cdev)
+{
+    if (ffs_epfile_head.list.next == NULL || cdev ==NULL) {
+        return NULL;
+    }
+
+    struct ffs_epfile_list *data_entry = NULL;
+    list_for_each_entry(data_entry, &ffs_epfile_head.list, list) {
+        if (data_entry != NULL && data_entry->ffs_epfile != NULL && data_entry->ffs_epfile->cdev == cdev) {
+            return data_entry->ffs_epfile;
+        }
+    }
+    return NULL;
 }
 
 static int ffs_epfile_open(struct inode *inode, struct file *file)
 {
-    struct ffs_epfile *epfile  = container_of(inode->i_cdev, struct ffs_epfile, cdev);
     ENTER();
+    struct ffs_epfile *epfile = find_ffs_epfile(inode->i_cdev);
+    if (epfile ==NULL) {
+        pr_err("[%s]epfile not found\n", __func__);
+        return -ENODEV;
+    }
+
     if (WARN_ON(epfile->ffs->state != FFS_ACTIVE))
         return -ENODEV;
 
@@ -1031,13 +1169,13 @@ static int ffs_epfile_mmap(struct file *file, struct vm_area_struct *vma)
     virt_mem = kmalloc(size, GFP_KERNEL);
     if (virt_mem == NULL)
     {
-        pr_info("%s alloc memory failed!\n", __FUNCTION__);
+        pr_info("%s alloc virt_mem memory failed!\n", __FUNCTION__);
         return -ENOMEM;
     }
     ffsm = kmalloc(sizeof(struct ffs_memory), GFP_KERNEL);
     if (ffsm == NULL)
     {
-        pr_info("%s alloc memory failed!\n", __FUNCTION__);
+        pr_info("%s alloc ffsm memory failed!\n", __FUNCTION__);
         goto error_free_mem;
     }
     if (remap_pfn_range(vma, vma->vm_start, virt_to_phys(virt_mem)>>PAGE_SHIFT,
@@ -1080,11 +1218,13 @@ static ssize_t ffs_epfile_iorw(struct file *file, struct ffs_io_data *io_data)
     if (!ep) {
         if (file->f_flags & O_NONBLOCK)
             return -EAGAIN;
-
+        pr_info("%s ep is null, wait epfile->ep interrupt.\n", __FUNCTION__);
         ret = wait_event_interruptible(
-                epfile->ffs->wait, (ep = epfile->ep));
-        if (ret)
+                epfile->ffs->wait, ((epfile->ep) || atomic_read(&epfile->force_wakeup)));
+        if (ret || !epfile->ep) {
+            atomic_set(&epfile->force_wakeup, 0);
             return -EINTR;
+        }
     }
 
     /* Do we halt? */
@@ -1127,7 +1267,8 @@ static ssize_t ffs_epfile_iorw(struct file *file, struct ffs_io_data *io_data)
     ffsm = generic_find_memory_area(epfile, io_data->buf, io_data->len);
     if (ffsm == NULL)
     {
-        return -EFAULT;
+        ret = -EFAULT;
+        goto error_lock;
     }
     if (epfile->ep != ep) {
         /* In the meantime, endpoint got disabled or changed. */
@@ -1198,6 +1339,7 @@ static ssize_t ffs_epfile_iorw(struct file *file, struct ffs_io_data *io_data)
         io_data->ep     = ep->ep;
         io_data->req    = req;
         io_data->epfile = epfile;
+        io_data->ffs = epfile->ffs;
 
         req->context  = io_data;
         req->complete = ffs_epfile_async_io_complete;
@@ -1222,7 +1364,6 @@ error:
 static long ffs_epfile_ioctl(struct file *file, unsigned code, unsigned long value)
 {
     struct ffs_epfile *epfile = file->private_data;
-    struct ffs_ep *ep = epfile->ep;
     int ret = 0;
     struct generic_memory mem;
     struct ffs_memory *ffsm = NULL;
@@ -1233,6 +1374,7 @@ static long ffs_epfile_ioctl(struct file *file, unsigned code, unsigned long val
         return -ENODEV;
 
     spin_lock_irq(&epfile->ffs->eps_lock);
+    struct ffs_ep *ep = epfile->ep;
 
     switch (code) {
     case FUNCTIONFS_ENDPOINT_QUEUE_INIT:
@@ -1244,12 +1386,15 @@ static long ffs_epfile_ioctl(struct file *file, unsigned code, unsigned long val
     case FUNCTIONFS_ENDPOINT_RELEASE_BUF:
         if (copy_from_user(&mem, (void __user *)value, sizeof(mem)))
         {
-            pr_info("copy from user failed\n");
+            pr_err("[%s:%d] copy from user failed\n", __func__, __LINE__);
+            spin_unlock_irq(&epfile->ffs->eps_lock);
             return -EFAULT;
         }
         ffsm = generic_find_memory_area(epfile, mem.buf, mem.size);
         if (ffsm == NULL)
         {
+            pr_err("[%s:%d] ffsm is null\n", __func__, __LINE__);
+            spin_unlock_irq(&epfile->ffs->eps_lock);
             return -EFAULT;
         }
         list_del(&ffsm->memlist);
@@ -1263,12 +1408,14 @@ static long ffs_epfile_ioctl(struct file *file, unsigned code, unsigned long val
         struct ffs_io_data io_data, *p = &io_data;
         ret = copy_from_user(&myIoData, (void __user *)value, sizeof(struct IoData));
         if (unlikely(ret)) {
+            pr_err("[%s:%d] copy from user failed\n", __func__, __LINE__);
             spin_unlock_irq(&epfile->ffs->eps_lock);
             return -EFAULT;
         }
         if (myIoData.aio) {
             p = kmalloc(sizeof(io_data), GFP_KERNEL);
             if (unlikely(!p)) {
+                pr_err("[%s:%d] kmalloc failed\n", __func__, __LINE__);
                 spin_unlock_irq(&epfile->ffs->eps_lock);
                 return -ENOMEM;
             }
@@ -1291,28 +1438,36 @@ static long ffs_epfile_ioctl(struct file *file, unsigned code, unsigned long val
         struct usb_request *req;
         struct IoData myIoData;
         if (!ep) {
+            pr_err("[%s:%d] ep is null\n", __func__, __LINE__);
+            atomic_set(&epfile->force_wakeup, 1);
+            wake_up_interruptible(&epfile->ffs->wait);
             spin_unlock_irq(&epfile->ffs->eps_lock);
             return -EFAULT;
         }
         ret = copy_from_user(&myIoData, (void __user *)value, sizeof(struct IoData));
         if (unlikely(ret)) {
+            pr_err("[%s:%d] cp from user failed\n", __func__, __LINE__);
             spin_unlock_irq(&epfile->ffs->eps_lock);
             return -EFAULT;
         }
         ffsm = generic_find_memory_area(epfile, myIoData.buf, myIoData.len);
         if (ffsm == NULL)
         {
+            pr_err("[%s:%d] ffsm is null\n", __func__, __LINE__);
+            spin_unlock_irq(&epfile->ffs->eps_lock);
             return -EFAULT;
         }
         list_for_each_entry(req, &epfile->ep->req->list, list) {
             if (req->buf == (void *)(ffsm->mem + myIoData.buf - ffsm->vm_start)) {
                 usb_ep_dequeue(epfile->ep->ep, req);
+                pr_info("[%s:%d] req dequeued\n", __func__, __LINE__);
                 spin_unlock_irq(&epfile->ffs->eps_lock);
                 return 0;
             }
         }
         if (epfile->ep->req->buf == (void *)(ffsm->mem + myIoData.buf - ffsm->vm_start)) {
             usb_ep_dequeue(epfile->ep->ep, epfile->ep->req);
+            pr_info("[%s:%d] epfile->ep->req dequeued\n", __func__, __LINE__);
             spin_unlock_irq(&epfile->ffs->eps_lock);
             return 0;
         }
@@ -1324,17 +1479,21 @@ static long ffs_epfile_ioctl(struct file *file, unsigned code, unsigned long val
         struct usb_request *req;
         struct IoData myIoData;
         if (!ep) {
+            pr_err("[%s:%d] ep is null\n", __func__, __LINE__);
             spin_unlock_irq(&epfile->ffs->eps_lock);
             return -EFAULT;
         }
         ret = copy_from_user(&myIoData,(void __user *)value, sizeof(struct IoData));
         if (unlikely(ret)) {
+            pr_err("[%s:%d] cp from user failed\n", __func__, __LINE__);
             spin_unlock_irq(&epfile->ffs->eps_lock);
             return -EFAULT;
         }
         ffsm = generic_find_memory_area(epfile, myIoData.buf, myIoData.len);
         if (ffsm == NULL)
         {
+            pr_err("[%s:%d] ffsm is null\n", __func__, __LINE__);
+            spin_unlock_irq(&epfile->ffs->eps_lock);
             return -EFAULT;
         }
         list_for_each_entry(req, &epfile->ep->req->list, list) {
@@ -1379,9 +1538,19 @@ static long ffs_epfile_ioctl(struct file *file, unsigned code, unsigned long val
             if (epfile->ffs->epfiles + i == epfile)
                 break;
         }
+        if (epfile->ffs->eps == NULL) {
+            pr_err("[%s:%d] eps has been freed\n", __func__, __LINE__);
+            ret = -EFAULT;
+            break;
+        }
         ep = epfile->ffs->eps + i;
         desc = ep->descs[desc_idx];
+        pr_info("[%s:%d] spin_unlock_irq\n", __func__, __LINE__);
         spin_unlock_irq(&epfile->ffs->eps_lock);
+        if (!desc || IS_ERR(desc)) {
+            pr_err("[%s:%d] invalid desc %x\n", __func__, __LINE__, desc);
+            return -EFAULT;
+        }
         ret = copy_to_user((void __user *)value, desc, desc->bLength);
         if (ret)
             ret = -EFAULT;
@@ -1478,9 +1647,6 @@ static long usbfn_ioctl(struct file *file, unsigned int cmd, unsigned long value
                 return (-ENOMEM);
             }
 
-            if (newfn.nameLen > MAX_NAMELEN) {
-                return -EPERM;
-            }
             memcpy(ffs->dev_name, newfn.name, newfn.nameLen);
             
             if (unlikely(!ffs->dev_name)) {
@@ -1505,9 +1671,18 @@ static long usbfn_ioctl(struct file *file, unsigned int cmd, unsigned long value
                 ffs_data_put(ffs);
                 return -EBUSY;
             }
-            cdev_init(&ffs->cdev, &ffs_ep0_operations);
+            ffs->cdev = cdev_alloc();
+            pr_warn("[%s] cdev_alloc\n", __func__);
+            dump_stack();
+            if (!ffs->cdev) {
+                pr_err("newfn cdev_alloc failed\n");
+                ffs_release_dev(ffs);
+                ffs_data_put(ffs);
+                return -EFAULT;
+            }
+            ffs->cdev->ops = &ffs_ep0_operations;
             ffs->devno = MKDEV(MAJOR(g_dev), 0);
-            ret = cdev_add(&ffs->cdev, ffs->devno, 1);
+            ret = cdev_add(ffs->cdev, ffs->devno, 1);
             if (ret) {
                 ffs_release_dev(ffs);
                 ffs_data_put(ffs);
@@ -1515,8 +1690,10 @@ static long usbfn_ioctl(struct file *file, unsigned int cmd, unsigned long value
             }
 
             ffs->fn_device = device_create(ffs_class, NULL, ffs->devno, NULL, nameEp0);
-            if (IS_ERR(ffs->fn_device)) {
-                cdev_del(&ffs->cdev);
+            if (IS_ERR(ffs->fn_device) || !map_cdev_to_ffs_data(ffs)) {
+                pr_err("[%s] cdev_del\n", __func__);
+                dump_stack();
+                cdev_del(ffs->cdev);
                 ffs_release_dev(ffs);
                 ffs_data_put(ffs);
                 return -EBUSY;
@@ -1538,8 +1715,17 @@ static long usbfn_ioctl(struct file *file, unsigned int cmd, unsigned long value
                 return -EFAULT;
             }
             ffs = ffs_dev->ffs_data;
+            if (unlikely(!ffs)) {
+                return (-EINVAL);
+            }
             device_destroy(ffs_class, ffs->devno);
-            cdev_del(&ffs->cdev);
+            pr_warn("[%s] cdev_del\n", __func__);
+            dump_stack();
+            cdev_del(ffs->cdev);
+            pr_warn("[%s] unmap_cdev_to_ffs_data\n", __func__);
+            if (!unmap_cdev_to_ffs_data(ffs)) {
+                pr_warn("[%s] unmap_cdev_to_ffs_data failed", __func__);
+            }
             unregister_chrdev_region(g_dev, MAX_EP_DEV);
             ffs_release_dev(ffs);
             ffs_data_clear(ffs);
@@ -1592,7 +1778,6 @@ static int functionfs_init(void)
     else
         pr_err("failed registering file system (%d)\n", ret);
 
-    //ffs_class = class_create(THIS_MODULE, "functionfs");
     ffs_class = class_create("functionfs");
     if (IS_ERR(ffs_class))
         return PTR_ERR(ffs_class);
@@ -1782,27 +1967,43 @@ static int ffs_epfiles_create(struct ffs_data *ffs)
         init_waitqueue_head(&epfile->wait_que);
         if (ffs->user_flags & FUNCTIONFS_VIRTUAL_ADDR) {
             if (sprintf(epfile->name, "%s.ep%02x", ffs->dev_name, ffs->eps_addrmap[i]) < 0) {
+                pr_err("[%s:%d] sprintf failed\n", __func__, __LINE__);
+                ffs_epfiles_destroy(epfiles, i - 1);
                 return -EFAULT;
             }
         } else {
             if (sprintf(epfile->name, "%s.ep%u", ffs->dev_name, i) < 0) {
+                pr_err("[%s:%d] sprintf failed\n", __func__, __LINE__);
+                ffs_epfiles_destroy(epfiles, i - 1);
                 return -EFAULT;
             }
         }
-
-        cdev_init(&epfile->cdev, &ffs_epfile_operations);
+        atomic_set(&epfile->force_wakeup, 0);
+        epfile->cdev = cdev_alloc();
+        pr_warn("[%s] cdev_alloc\n", __func__);
+        dump_stack();
+        if (!epfile->cdev) {
+            pr_err("ffs_epfiles_create cdev_alloc failed\n");
+            ffs_epfiles_destroy(epfiles, i - 1);
+            return -EFAULT;
+        }
+        epfile->cdev->ops = &ffs_epfile_operations;
         epfile->devno=MKDEV(MAJOR(ffs->devno), i);
-        ret = cdev_add(&epfile->cdev, epfile->devno, 1);
+        ret = cdev_add(epfile->cdev, epfile->devno, 1);
         if (ret)
         {
+            pr_err("[%s:%d] cdev_add failed\n", __func__, __LINE__);
+            cdev_del(epfile->cdev);
             ffs_epfiles_destroy(epfiles, i - 1);
             return -EBUSY;
         }
 
         epfile->device = device_create(ffs_class, NULL, epfile->devno, NULL, epfile->name);
-        if (IS_ERR(epfile->device))
+        if (IS_ERR(epfile->device) || !map_cdev_to_ffs_epfile(epfile))
         {
-            cdev_del(&epfile->cdev);
+            pr_err("[%s] cdev_del\n", __func__);
+            dump_stack();
+            cdev_del(epfile->cdev);
             ffs_epfiles_destroy(epfiles, i - 1);
             return -EBUSY;
         }
@@ -1821,7 +2022,12 @@ static void ffs_epfiles_destroy(struct ffs_epfile *epfiles, unsigned count)
     for (; count; --count, ++epfile) {
         BUG_ON(mutex_is_locked(&epfile->mutex));
         device_destroy(ffs_class, epfile->devno);
-        cdev_del(&epfile->cdev);
+        pr_warn("[%s] cdev_del\n",__func__);
+        dump_stack();
+        cdev_del(epfile->cdev);
+        if (!unmap_cdev_to_ffs_epfile(epfile)) {
+            pr_warn("[%s] unmap_cdev_to_ffs_epfile failed", __func__);
+        }
     }
 
     kfree(epfiles);
@@ -3227,7 +3433,7 @@ static int ffs_func_set_alt(struct usb_function *f,
         return -ENODEV;
     }
 
-    if (ffs->state != FFS_ACTIVE)
+    if (ffs == NULL || ffs->state != FFS_ACTIVE)
         return -ENODEV;
 
     if (alt == (unsigned)-1) {
@@ -3273,11 +3479,17 @@ static int ffs_func_setup(struct usb_function *f, const struct usb_ctrlrequest *
      * types are only handled when the user flag FUNCTIONFS_ALL_CTRL_RECIP
      * is being used.
      */
-    if (ffs->state != FFS_ACTIVE)
+    if (!ffs || ffs->state != FFS_ACTIVE) {
+        pr_err("[%s:%d] ffs is null or ffs->state is not active: %d\n", __func__, __LINE__, ffs);
         return -ENODEV;
+    }
 
     switch (creq->bRequestType & USB_RECIP_MASK) {
     case USB_RECIP_INTERFACE:
+        if (creq->bRequestType == (USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_INTERFACE) &&
+            creq->bRequest == USB_CDC_SET_COMM_FEATURE) {
+                return -EOPNOTSUPP;
+            }
         ret = ffs_func_revmap_intf(func, le16_to_cpu(creq->wIndex));
         if (unlikely(ret < 0))
             return ret;
@@ -3297,6 +3509,13 @@ static int ffs_func_setup(struct usb_function *f, const struct usb_ctrlrequest *
         else
             return -EOPNOTSUPP;
     }
+    pr_info("f_generic setup:bRequestType=%02x,bRequest=%02x,wValue=%04x,wIndex=%04x,wLength=%04x,ret=%d\n",
+        creq->bRequestType,
+        creq->bRequest,
+        le16_to_cpu(creq->wValue),
+        le16_to_cpu(creq->wIndex),
+        le16_to_cpu(creq->wLength),
+        ret);
 
     spin_lock_irqsave(&ffs->ev.waitq.lock, flags);
     ffs->ev.setup = *creq;
@@ -3488,7 +3707,7 @@ static void ffs_free(struct usb_function *f)
     kfree(ffs_func_from_usb(f));
 }
 
-static void ffs_func_unbind(struct usb_configuration *c,
+static void fgeneric_func_unbind(struct usb_configuration *c,
                 struct usb_function *f)
 {
     struct ffs_function *func = ffs_func_from_usb(f);
@@ -3500,6 +3719,8 @@ static void ffs_func_unbind(struct usb_configuration *c,
     unsigned long flags;
 
     ENTER();
+    pr_info("[%s:%d] f_generic unbind\n", __func__, __LINE__);
+
     if (ffs->func == func) {
         ffs_func_eps_disable(func);
         ffs->func = NULL;
@@ -3516,6 +3737,7 @@ static void ffs_func_unbind(struct usb_configuration *c,
         ep->req = NULL;
         ++ep;
     }
+    func->ffs->eps = NULL;
     spin_unlock_irqrestore(&func->ffs->eps_lock, flags);
     kfree(func->eps);
     func->eps = NULL;
@@ -3551,7 +3773,7 @@ static struct usb_function *ffs_alloc(struct usb_function_instance *fi)
     func->function.name    = "FunctionFS Adapter";
 
     func->function.bind    = ffs_func_bind;
-    func->function.unbind  = ffs_func_unbind;
+    func->function.unbind  = fgeneric_func_unbind;
     func->function.set_alt = ffs_func_set_alt;
     func->function.get_alt = ffs_func_get_alt;
     func->function.disable = ffs_func_disable;
