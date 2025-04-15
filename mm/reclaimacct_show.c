@@ -10,6 +10,7 @@
 #include <linux/seq_file.h>
 #include <linux/slab.h>
 #include <linux/time64.h>
+#include <linux/sched/clock.h>
 
 #include "internal.h"
 
