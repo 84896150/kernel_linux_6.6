@@ -703,7 +703,7 @@ void memcg_eswap_info_show(struct seq_file *m)
 	zram = memcg_data_size(memcg, CACHE_SIZE) / SZ_1K;
 	eswap = memcg_data_size(memcg, SWAP_SIZE) / SZ_1K;
 	anon *= PAGE_SIZE / SZ_1K;
-	file *= PAGE_SIZE / SZ_1K;
+	file = 0;
 	seq_printf(m, "Anon:\t%12lu kB\nFile:\t%12lu kB\nzram:\t%12lu kB\nEswap:\t%12lu kB\n",
 		anon, file, zram, eswap);
 }
