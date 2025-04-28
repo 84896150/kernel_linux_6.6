@@ -47,6 +47,7 @@ int generic_fadvise(struct file *file, loff_t offset, loff_t len, int advice)
 		return -EINVAL;
 
 	bdi = inode_to_bdi(mapping->host);
+	pr_warn("zyf1\n");
 
 	if (IS_DAX(inode) || (bdi == &noop_backing_dev_info)) {
 		switch (advice) {
@@ -57,13 +58,14 @@ int generic_fadvise(struct file *file, loff_t offset, loff_t len, int advice)
 		case POSIX_FADV_NOREUSE:
 		case POSIX_FADV_DONTNEED:
 			/* no bad return value, but ignore advice */
+			pr_warn("zyf2\n");
 			break;
 		default:
 			return -EINVAL;
 		}
 		return 0;
 	}
-
+	pr_warn("zyf3\n");
 	/*
 	 * Careful about overflows. Len == 0 means "as much as possible".  Use
 	 * unsigned math because signed overflows are undefined and UBSan
