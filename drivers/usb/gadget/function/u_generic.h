@@ -270,7 +270,7 @@ struct ffs_data {
 
 
 	char					dev_name[MAX_NAMELEN];
-	struct cdev 			cdev;
+	struct cdev 			*cdev;
 	dev_t 					devno;
 	struct device 			*fn_device;
 

@@ -168,6 +168,17 @@ static bool migrate_one_irq(struct irq_desc *desc)
 #endif
 		brokeaff = true;
 	}
+	/*
+	 * Do not set the force argument of irq_do_set_affinity() as this
+	 * disables the masking of offline CPUs from the supplied affinity
+	 * mask and therefore might keep/reassign the irq to the outgoing
+	 * CPU.
+	 */
+#ifdef CONFIG_CPU_ISOLATION_OPT
+	err = irq_set_affinity_locked(d, affinity, false);
+#else
+	err = irq_do_set_affinity(d, affinity, false);
+#endif
 
 	/*
 	 * If there are online CPUs in the affinity mask, but they have no
@@ -180,17 +191,8 @@ static bool migrate_one_irq(struct irq_desc *desc)
 
 		affinity = cpu_online_mask;
 		brokeaff = true;
-		/*
-		 * Do not set the force argument of irq_do_set_affinity() as this
-		 * disables the masking of offline CPUs from the supplied affinity
-		 * mask and therefore might keep/reassign the irq to the outgoing
-		 * CPU.
-		 */
-#ifdef CONFIG_CPU_ISOLATION_OPT
-		err = irq_set_affinity_locked(d, affinity, false);
-#else
+
 		err = irq_do_set_affinity(d, affinity, false);
-#endif
 	}
 
 	if (err) {
