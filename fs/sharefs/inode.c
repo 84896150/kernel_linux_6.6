@@ -296,7 +296,10 @@ static int sharefs_setattr(struct mnt_idmap *idmap, struct dentry *dentry, struc
 	lower_inode = sharefs_lower_inode(inode);
 
 	/* prepare our own lower struct iattr (with the lower file) */
-	memcpy(&lower_ia, ia, sizeof(lower_ia));
+	err = memcpy_s(&lower_ia, sizeof(lower_ia), ia, sizeof(lower_ia));
+	if (err){
+		goto out;
+	}
 	if (ia->ia_valid & ATTR_FILE)
 		lower_ia.ia_file = sharefs_lower_file(ia->ia_file);
 
