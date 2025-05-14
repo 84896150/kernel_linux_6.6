@@ -2,7 +2,7 @@
 /*
  * fs/hmdfs/comm/authority/config.c
  *
- * Copyright (c) 2020-2021 Huawei Device Co., Ltd.
+ * Copyright (c) 2020-2025 Huawei Device Co., Ltd.
  */
 
 #include <linux/configfs.h>
