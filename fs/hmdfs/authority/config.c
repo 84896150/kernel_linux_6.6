@@ -2,7 +2,7 @@
 /*
  * fs/hmdfs/comm/authority/config.c
  *
- * Copyright (c) 2020-2021 Huawei Device Co., Ltd.
+ * Copyright (c) 2020-2025 Huawei Device Co., Ltd.
  */
 
 #include <linux/configfs.h>
@@ -267,9 +267,11 @@ static struct configfs_attribute hmdfs_##_attr_##_attr = {		\
 };					
 
 HMDFS_BUNDLE_ATTRIBUTE(appid)
+HMDFS_BUNDLE_ATTRIBUTE(debug_type)
 
 static struct configfs_attribute *hmdfs_battrs[] = {
 	&hmdfs_appid_attr,
+	&hmdfs_debug_type_attr,
 	NULL,
 };
 
@@ -282,6 +284,8 @@ static void hmdfs_config_bitem_release(struct config_item *item)
 	bitem = container_of(item, struct hmdfs_config_bitem, item);
 	remove_appid_hash_entry(&bitem->str);
 	remove_appid_hash_entry(&bitem->str);
+	remove_debug_type_hash_entry(&bitem->str);
+	remove_debug_type_hash_entry(&bitem->str);
 	free_bitem(bitem);
 }
 
@@ -339,6 +343,11 @@ int get_bid(const char *bname)
 	return hmdfs_appid_get(bname);
 }
 
+int get_debug_type(const char *bname)
+{
+	return hmdfs_debug_type_get(bname);
+}
+
 int __init hmdfs_init_configfs(void)
 {
 	int err;
@@ -372,6 +381,7 @@ void hmdfs_exit_configfs(void)
 
 	configfs_unregister_subsystem(&hmdfs_subsystem);
 	clear_appid_hash_entry();
+	clear_debug_type_hash_entry();
 
 	kmem_cache_destroy(hmdfs_bid_entry_cachep);
 }
