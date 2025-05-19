@@ -155,7 +155,7 @@ static __refdata struct memblock_type *memblock_memory = &memblock.memory;
 			pr_info(fmt, ##__VA_ARGS__);			\
 	} while (0)
 
-static int memblock_debug __initdata_memblock;
+static int memblock_debug __initdata_memblock = 1;
 static bool system_has_some_mirror __initdata_memblock;
 static int memblock_can_resize __initdata_memblock;
 static int memblock_memory_in_slab __initdata_memblock;
