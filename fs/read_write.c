@@ -1251,6 +1251,7 @@ static ssize_t do_sendfile(int out_fd, int in_fd, loff_t *ppos,
 		if (retval < 0)
 			goto fput_out;
 		file_start_write(out.file);
+		printk("i_op %px, a_ops %px\n", in.file->f_inode->i_op, in.file->f_mapping->a_ops);
 		retval = do_splice_direct(in.file, &pos, out.file, &out_pos,
 					  count, fl);
 		file_end_write(out.file);
