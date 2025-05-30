@@ -3252,12 +3252,7 @@ static int __set_cpus_allowed_ptr_locked(struct task_struct *p,
 
 	__do_set_cpus_allowed(p, ctx);
 
-#ifdef CONFIG_CPU_ISOLATION_OPT
-	if (cpumask_test_cpu(task_cpu(p), &allowed_mask))
-		goto out;
-#else
 	return affine_move_task(rq, p, rf, dest_cpu, ctx->flags);
-#endif
 
 out:
 	task_rq_unlock(rq, p, rf);
