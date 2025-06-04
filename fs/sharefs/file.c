@@ -232,6 +232,7 @@ int sharefs_file_mmap(struct file *file, struct vm_area_struct *vma)
 
 	vma->vm_file = get_file(lower_file);
 	err = call_mmap(vma->vm_file, vma);
+
 	if (err)
 		fput(lower_file);
 	else
