@@ -512,6 +512,12 @@ config DRIVERS_HDF_USB_F_GENERIC
 	help
 		Answer Y to choice HDF USB F_GENERIC driver.
 
+config USB_CONFIGFS_F_ACC
+	bool "Enable F_ACC driver"
+	default y
+	help
+		Answer Y to choice HDF USB F_ACC driver.
+
 source "drivers/usb/gadget/legacy/Kconfig"
 
 endif # USB_GADGET
