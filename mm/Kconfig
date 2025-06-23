@@ -1264,6 +1264,21 @@ config ANON_VMA_NAME
 	  area from being merged with adjacent virtual memory areas due to the
 	  difference in their name.
 
+#
+# For lmkd to trigger in-kernel lowmem info
+#
+config LOWMEM
+        bool "Low Memory Killer"
+	default y
+	help
+	  Enables lowmem killer parameter tuning
+
+config LMKD_DBG
+	bool "Low Memory Killer Debug"
+	default y
+	help
+	  print processes info when lmk happen per several seconds
+
 config USERFAULTFD
 	bool "Enable userfaultfd() system call"
 	depends on MMU
@@ -1357,5 +1372,15 @@ config PURGEABLE_ASHMEM
 	  Support purgeable ashmem for process
 
 source "mm/damon/Kconfig"
+
+#
+# Use rss_threshold to monitoring RSS
+#
+config RSS_THRESHOLD
+	bool "Enable /proc/<pid>/rss and /proc/<pid>/rss_threshold to monitoring RSS"
+	default y
+	depends on PROC_FS && MEMCG
+	help
+	  Set a threshold to monitoring RSS in per pid
 
 endmenu
