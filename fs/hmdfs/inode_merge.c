@@ -635,6 +635,7 @@ static int lookup_merge_root(struct inode *root_inode,
 	int ret = -ENOENT;
 	bool locked, down;
 
+	lock_root_inode_shared(root_inode, &locked, &down);
 	dentry_dev = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
 	if (IS_ERR(dentry_dev)) {
 		ret = PTR_ERR(dentry_dev);
