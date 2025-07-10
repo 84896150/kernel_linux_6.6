@@ -112,7 +112,7 @@ void update_inode_attr(struct inode *inode, struct dentry *child_dentry);
 int get_num_comrades(struct dentry *dentry);
 void assign_comrades_unlocked(struct dentry *child_dentry,
 			      struct list_head *onstack_comrades_head);
-struct hmdfs_dentry_comrade *lookup_comrade(struct dentry lower_dentry,
+struct hmdfs_dentry_comrade *lookup_comrade(struct dentry *lower_dentry,
 					    const char *d_name,
 					    int dev_id,
 					    unsigned int flags);

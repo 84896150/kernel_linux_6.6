@@ -217,7 +217,7 @@ void assign_comrades_unlocked(struct dentry *child_dentry,
 	mutex_unlock(&cdi->comrade_list_lock);
 }
 
-struct hmdfs_dentry_comrade *lookup_comrade(struct path lower_path,
+struct hmdfs_dentry_comrade *lookup_comrade(struct dentry *lower_dentry,
 					    const char *d_name,
 					    int dev_id,
 					    unsigned int flags)
@@ -225,7 +225,7 @@ struct hmdfs_dentry_comrade *lookup_comrade(struct path lower_path,
 	struct dentry *dentry = NULL;
 	struct hmdfs_dentry_comrade *comrade = NULL;
 
-	dentry = lookup_multi_dir(sbi->sb->s_root, name, root);
+	dentry = lookup_multi_dir(lower_dentry, d_name, flags);
 	if (IS_ERR(dentry)) {
 		return ERR_PTR(PTR_ERR(dentry));
 	}
@@ -349,7 +349,7 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 	struct hmdfs_dentry_comrade *comrade = NULL;
 	const struct cred *old_cred = hmdfs_override_creds(sbi->cred);
 
-	dentry = lookup_multi_dir(sbi->sb->s_root, name, root);
+	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
 	if (IS_ERR(dentry)) {
 		comrade = ERR_PTR(PTR_ERR(dentry));
 		goto out;
