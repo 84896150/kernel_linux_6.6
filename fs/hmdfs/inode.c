@@ -4,6 +4,7 @@
  *
  * Copyright (c) 2020-2021 Huawei Device Co., Ltd.
  */
+#include <linux/string.h>
 
 #include "hmdfs_device_view.h"
 #include "inode.h"
@@ -354,4 +355,30 @@ void hmdfs_update_upper_file(struct file *upper_file, struct file *lower_file)
 		i_size_write(upper_file->f_inode, lower_size);
 		truncate_inode_pages(upper_file->f_inode->i_mapping, 0);
 	}
+}
+
+struct dentry *lookup_multi_dir(struct dentry *root_dentry,
+							    const char *name,
+							    unsigned int flags)
+{
+	struct dentry *current_dentry = root_dentry;
+	struct dentry *ret_dentry = NULL;
+	const char *start = name;
+	const char *end = NULL;
+
+	while (*start) {
+		end = strchr(start, '/');
+		if (!end) {
+			end = start + strlen(start);
+		}
+		ret_dentry = lookup_one_len(start current_dentry, end - start);
+		if (IS_ERR(ret_dentry)) {
+			dput(current_dentry);
+			return ret_dentry;
+		}
+		dput(current_dentry);
+		current_dentry = ret_dentry;
+		start = end;
+	}
+	return ret_dentry;
 }
