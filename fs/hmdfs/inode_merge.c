@@ -642,7 +642,7 @@ static int lookup_merge_root(struct inode *root_inode,
 	}
 
 	ret = do_lookup_merge_root(dentry_dev, child_dentry, flags);
-	dput(dev_dentry);
+	dput(dentry_dev);
 
 out:
 	restore_root_inode_sem(root_inode, locked, down);
