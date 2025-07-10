@@ -642,7 +642,7 @@ static int lookup_merge_root(struct inode *root_inode,
 	}
 
 	ret = do_lookup_merge_root(dentry_dev, child_dentry, flags);
-	dput(dev_dentry)
+	dput(dev_dentry);
 
 out:
 	restore_root_inode_sem(root_inode, locked, down);
@@ -1272,7 +1272,7 @@ int do_rename_merge(struct inode *old_dir, struct dentry *old_dentry,
 			ret = PTR_ERR(lo_d_new);
 			goto out;
 		}
-		if (d_is_positive(lo_d_child)) {
+		if (d_is_positive(lo_d_new)) {
 			ret = -EEXIST;
 			goto out;
 		}

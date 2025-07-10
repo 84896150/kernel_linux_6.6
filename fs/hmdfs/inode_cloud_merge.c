@@ -97,7 +97,7 @@ cloud_merge_lookup_comrade(struct hmdfs_sb_info *sbi,
 	struct dentry *dentry = NULL;
 	struct hmdfs_dentry_comrade *comrade = NULL;
 
-	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags	);
+	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
 	if (IS_ERR(dentry)) {
 		return ERR_PTR(PTR_ERR(dentry));
 	}
@@ -246,7 +246,7 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 	}
 
 	ret = do_lookup_cloud_merge_root(dentry_dev, child_dentry, flags);
-	dput(dentry_dev)
+	dput(dentry_dev);
 
 out:
 	restore_root_inode_sem(root_inode, locked, down);
