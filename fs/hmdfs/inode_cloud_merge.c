@@ -238,13 +238,12 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 	int ret = -ENOENT;
 	bool locked, down;
 
+	lock_root_inode_shared(root_inode, &locked, &down);
 	dentry_dev = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
 	if (IS_ERR(dentry_dev)) {
 		ret = PTR_ERR(dentry_dev);
 		goto out;
 	}
-
-	lock_root_inode_shared(root_inode, &locked, &down);
 
 	ret = do_lookup_cloud_merge_root(dentry_dev, child_dentry, flags);
 	dput(dentry_dev)

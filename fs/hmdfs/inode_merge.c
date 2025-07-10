@@ -230,7 +230,7 @@ struct hmdfs_dentry_comrade *lookup_comrade(struct path lower_path,
 		return ERR_PTR(PTR_ERR(dentry));
 	}
 
-	comrade = alloc_comrade(dentry, devid);
+	comrade = alloc_comrade(dentry, dev_id);
 	dput(dentry);
 	return comrade;
 }
