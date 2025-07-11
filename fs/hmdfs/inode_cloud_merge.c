@@ -550,7 +550,6 @@ int hmdfs_create_lower_cloud_dentry(struct inode *i_parent, struct dentry *d_chi
 	} else if (d_is_positive(dentry)) {
 		hmdfs_err("flt :: in hmdfs_create_lower_cloud_dentry EXIST!");
 		dput(dentry);
-		kfree(absolute_path_buf_tmp);
 	} else {
 		tmp_dentry = dentry;
 		p_dentry = tmp_dentry->d_parent;
@@ -558,9 +557,8 @@ int hmdfs_create_lower_cloud_dentry(struct inode *i_parent, struct dentry *d_chi
 			tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
 			p_dentry, p_dentry->d_name.name);
 		dput(dentry);
-		kfree(absolute_path_buf_tmp);
 	}
-
+	kfree(absolute_path_buf_tmp);
 	// to ensure link_comrade after vfs_mkdir succeed
 	ret = hmdfs_do_ops_cloud_merge(i_parent, d_child, lo_d_child, path,
 				 rec_op_para);
