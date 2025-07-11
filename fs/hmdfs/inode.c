@@ -382,11 +382,10 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		}
 		dput(current_dentry);
 		current_dentry = ret_dentry;
-		if (*end == '/') {
-			start = end + 1;
-		} else {
-			break;
+		while (*end == '/') {
+			end = end + 1;
 		}
+        start = end;
 	}
 	return ret_dentry;
 }
