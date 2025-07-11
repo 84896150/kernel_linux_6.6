@@ -1396,7 +1396,7 @@ int do_rename_merge(struct inode *old_dir, struct dentry *old_dentry,
 		hmdfs_err("flt :: in do_rename_merge BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
 			tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
 			p_dentry, p_dentry->d_name.name);
-		if (is_dir)
+		if (S_ISDIR(d_inode(old_dentry)->i_mode))
 			dentry = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf_tmp, LOOKUP_DIRECTORY);
 		else
 			dentry = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf_tmp, 0);
