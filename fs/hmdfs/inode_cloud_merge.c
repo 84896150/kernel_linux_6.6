@@ -98,7 +98,7 @@ cloud_merge_lookup_comrade(struct hmdfs_sb_info *sbi,
 	struct hmdfs_dentry_comrade *comrade = NULL;
 
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
-	if (IS_ERR(dentry)) {
+	if (dentry == NULL || IS_ERR(dentry)) {
 		return ERR_PTR(PTR_ERR(dentry));
 	}
 
@@ -240,7 +240,7 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 
 	lock_root_inode_shared(root_inode, &locked, &down);
 	dentry_dev = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
-	if (IS_ERR(dentry_dev)) {
+	if (dentry_dev == NULL || IS_ERR(dentry_dev)) {
 		ret = PTR_ERR(dentry_dev);
 		goto out;
 	}
@@ -455,7 +455,7 @@ int hmdfs_create_lower_cloud_dentry(struct inode *i_parent, struct dentry *d_chi
 		lo_d_child = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf, LOOKUP_DIRECTORY);
 	else
 		lo_d_child = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf, 0);
-	if (IS_ERR(lo_d_child)) {
+	if (lo_d_child  == NULL || IS_ERR(lo_d_child)) {
 		ret = PTR_ERR(lo_d_child);
 		goto out;
 	}

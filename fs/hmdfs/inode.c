@@ -366,6 +366,10 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 	const char *start = name;
 	const char *end = NULL;
 
+	if (*start) {
+		dget(root_dentry);
+	}
+
 	while (*start) {
 		end = strchr(start, '/');
 		if (!end) {
