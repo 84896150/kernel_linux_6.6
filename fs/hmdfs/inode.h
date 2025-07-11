@@ -264,5 +264,5 @@ uint32_t make_ino_raw_cloud(uint8_t *cloud_id);
 
 struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 							    const char *name,
-							    unsigned int flags)
+							    unsigned int flags);
 #endif // INODE_H
