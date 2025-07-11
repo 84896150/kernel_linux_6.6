@@ -380,17 +380,21 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 		} else {
 			hmdfs_err("flt :: IS_ERR(dentry)");
 		}
+        dput(dentry);
+        path_put(&root);
+        path_put(&path);
+        return ERR_PTR(PTR_ERR(dentry));
 	} else {
 		tmp_dentry = dentry;
 		p_dentry = tmp_dentry->d_parent;
 		hmdfs_err("flt :: in merge_lookup_comrade AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
 		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
 		p_dentry, p_dentry->d_name.name);
-		dput(dentry);
 	}
 	
-	comrade = alloc_comrade(path.dentry, devid);
+	comrade = alloc_comrade(dentry, devid);
 
+    dput(dentry);
 	path_put(&path);
 root_put:
 	path_put(&root);
