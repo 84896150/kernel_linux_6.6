@@ -119,7 +119,7 @@ cloud_merge_lookup_comrade(struct hmdfs_sb_info *sbi,
 		p_dentry, p_dentry->d_name.name);
 	
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
-	if (IS_ERR(dentry)) {
+	if (dentry == NULL || IS_ERR(dentry)) {
 		hmdfs_err("flt :: in cloud_merge_lookup_comrade lookup_multi_dir FAILED!");
 	} else {
 		tmp_dentry = dentry;
@@ -297,7 +297,7 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 		p_dentry, p_dentry->d_name.name);
 
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
-	if (IS_ERR(dentry)) {
+	if (dentry == NULL || IS_ERR(dentry)) {
 		hmdfs_err("flt :: in lookup_cloud_merge_root lookup_multi_dir FAILED!");
 	} else {
 		tmp_dentry = dentry;
@@ -545,7 +545,7 @@ int hmdfs_create_lower_cloud_dentry(struct inode *i_parent, struct dentry *d_chi
 		dentry = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf_tmp, LOOKUP_DIRECTORY);
 	else
 		dentry = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf_tmp, 0);
-	if (IS_ERR(dentry)) {
+	if (dentry == NULL || IS_ERR(dentry)) {
 		hmdfs_err("flt :: in hmdfs_create_lower_cloud_dentry lookup_multi_dir FAILED!");
 	} else if (d_is_positive(dentry)) {
 		hmdfs_err("flt :: in hmdfs_create_lower_cloud_dentry EXIST!");
