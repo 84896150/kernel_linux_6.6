@@ -369,6 +369,7 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 	}
 
 	while (*start) {
+		hmdfs_err("flt :: lookup_multi_dir work  ==  %s\n", start);
 		end = strchr(start, '/');
 		if (!end) {
 			end = start + strlen(start);

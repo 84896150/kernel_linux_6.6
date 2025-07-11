@@ -354,6 +354,8 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 	struct dentry *p_dentry = NULL;
 	struct dentry *dentry = NULL;
 
+	hmdfs_err("flt :: init merge_lookup_comrade, name = %s\n", name);
+
 	err = kern_path(sbi->real_dst, LOOKUP_DIRECTORY, &root);
 	if (err) {
 		comrade = ERR_PTR(err);
