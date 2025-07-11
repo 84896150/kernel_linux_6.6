@@ -354,7 +354,7 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 	struct dentry *p_dentry = NULL;
 	struct dentry *dentry = NULL;
 
-
+	hmdfs_err("flt :: init merge_lookup_comrade, name = %s\n", name);
 	err = kern_path(sbi->real_dst, LOOKUP_DIRECTORY, &root);
 	if (err) {
 		comrade = ERR_PTR(err);
@@ -375,6 +375,11 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
 	if (dentry == NULL || IS_ERR(dentry)) {
 		hmdfs_err("flt :: in merge_lookup_comrade lookup_multi_dir FAILED!");
+		if (dentry == NULL) {
+			hmdfs_err("flt :: dentry == NULL");
+		} else {
+			hmdfs_err("flt :: IS_ERR(dentry)");
+		}
 	} else {
 		tmp_dentry = dentry;
 		p_dentry = tmp_dentry->d_parent;

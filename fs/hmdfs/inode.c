@@ -373,9 +373,11 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		if (!end) {
 			end = start + strlen(start);
 		}
+		hmdfs_err("flt :: goto lookup_one_len name = %s, len = %d\n", start, end - start);
 		ret_dentry = lookup_one_len(start, current_dentry, end - start);
 		if (IS_ERR(ret_dentry)) {
 			dput(current_dentry);
+			hmdfs_err("flt :: lookup_one_len failed!");
 			return ret_dentry;
 		}
 		dput(current_dentry);
