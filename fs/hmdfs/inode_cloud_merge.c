@@ -97,6 +97,9 @@ cloud_merge_lookup_comrade(struct hmdfs_sb_info *sbi,
 	int err;
 	struct path root, path;
 	struct hmdfs_dentry_comrade *comrade = NULL;
+	struct dentry *tmp_dentry = NULL;
+	struct dentry *p_dentry = NULL;
+	struct dentry *dentry = NULL;
 
 	err = kern_path(sbi->real_dst, LOOKUP_DIRECTORY, &root);
 	if (err) {
@@ -109,7 +112,23 @@ cloud_merge_lookup_comrade(struct hmdfs_sb_info *sbi,
 		comrade = ERR_PTR(err);
 		goto root_put;
 	}
-
+	tmp_dentry = path.dentry;
+	p_dentry = tmp_dentry->d_parent;
+	hmdfs_err("flt :: in cloud_merge_lookup_comrade BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+	
+	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
+	if (IS_ERR(dentry)) {
+		hmdfs_err("flt :: in cloud_merge_lookup_comrade lookup_multi_dir FAILED!");
+	} else {
+		tmp_dentry = dentry;
+		p_dentry = tmp_dentry->d_parent;
+		hmdfs_err("flt :: in cloud_merge_lookup_comrade AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+		dput(dentry);
+	}
 	comrade = alloc_comrade(path.dentry, devid);
 
 	path_put(&path);
@@ -251,6 +270,9 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 	int buf_len;
 	char *buf = NULL;
 	bool locked, down;
+	struct dentry *dentry = NULL;
+	struct dentry *p_dentry = NULL;
+	struct dentry *tmp_dentry = NULL;
 
 	// consider additional one slash and one '\0'
 	buf_len = strlen(sbi->real_dst) + 1 + sizeof(DEVICE_VIEW_ROOT);
@@ -267,6 +289,24 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 				   &path_dev);
 	if (ret)
 		goto free_buf;
+
+	tmp_dentry = path_dev.dentry;
+	p_dentry = tmp_dentry->d_parent;
+	hmdfs_err("flt :: in lookup_cloud_merge_root BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+
+	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
+	if (IS_ERR(dentry)) {
+		hmdfs_err("flt :: in lookup_cloud_merge_root lookup_multi_dir FAILED!");
+	} else {
+		tmp_dentry = dentry;
+		p_dentry = tmp_dentry->d_parent;
+		hmdfs_err("flt :: in lookup_cloud_merge_root AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+		dput(dentry);
+	}
 
 	ret = do_lookup_cloud_merge_root(path_dev, child_dentry, flags);
 	path_put(&path_dev);
@@ -458,6 +498,10 @@ int hmdfs_create_lower_cloud_dentry(struct inode *i_parent, struct dentry *d_chi
 	char *path_name = NULL;
 	struct path path = { .mnt = NULL, .dentry = NULL };
 	int ret = 0;
+	char *absolute_path_buf_tmp = kmalloc(PATH_MAX, GFP_KERNEL);
+	struct dentry *dentry = NULL;
+	struct dentry *p_dentry = NULL;
+	struct dentry *tmp_dentry = NULL;
 
 	if (unlikely(!path_buf || !absolute_path_buf)) {
 		ret = -ENOMEM;
@@ -478,6 +522,9 @@ int hmdfs_create_lower_cloud_dentry(struct inode *i_parent, struct dentry *d_chi
 	sprintf(absolute_path_buf, "%s%s/%s", sbi->real_dst, path_name,
 		d_child->d_name.name);
 
+	sprintf(absolute_path_buf_tmp, "%s/%s", path_name,
+		d_child->d_name.name);
+
 	if (is_dir)
 		lo_d_child = kern_path_create(AT_FDCWD, absolute_path_buf,
 					      &path, LOOKUP_DIRECTORY);
@@ -488,6 +535,32 @@ int hmdfs_create_lower_cloud_dentry(struct inode *i_parent, struct dentry *d_chi
 		ret = PTR_ERR(lo_d_child);
 		goto out;
 	}
+	tmp_dentry = lo_d_child;
+	p_dentry = tmp_dentry->d_parent;
+	hmdfs_err("flt :: in hmdfs_create_lower_cloud_dentry BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+
+	if (is_dir)
+		dentry = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf_tmp, LOOKUP_DIRECTORY);
+	else
+		dentry = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf_tmp, 0);
+	if (IS_ERR(dentry)) {
+		hmdfs_err("flt :: in hmdfs_create_lower_cloud_dentry lookup_multi_dir FAILED!");
+	} else if (d_is_positive(dentry)) {
+		hmdfs_err("flt :: in hmdfs_create_lower_cloud_dentry EXIST!");
+		dput(dentry);
+		kfree(absolute_path_buf_tmp);
+	} else {
+		tmp_dentry = dentry;
+		p_dentry = tmp_dentry->d_parent;
+		hmdfs_err("flt :: in hmdfs_create_lower_cloud_dentry AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+			tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+			p_dentry, p_dentry->d_name.name);
+		dput(dentry);
+		kfree(absolute_path_buf_tmp);
+	}
+
 	// to ensure link_comrade after vfs_mkdir succeed
 	ret = hmdfs_do_ops_cloud_merge(i_parent, d_child, lo_d_child, path,
 				 rec_op_para);

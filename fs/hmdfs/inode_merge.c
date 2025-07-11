@@ -350,6 +350,9 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 	struct path root, path;
 	struct hmdfs_dentry_comrade *comrade = NULL;
 	const struct cred *old_cred = hmdfs_override_creds(sbi->cred);
+	struct dentry *tmp_dentry = NULL;
+	struct dentry *p_dentry = NULL;
+	struct dentry *dentry = NULL;
 
 	err = kern_path(sbi->real_dst, LOOKUP_DIRECTORY, &root);
 	if (err) {
@@ -361,6 +364,23 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 	if (err) {
 		comrade = ERR_PTR(err);
 		goto root_put;
+	}
+	tmp_dentry = path.dentry;
+	p_dentry = tmp_dentry->d_parent;
+	hmdfs_err("flt :: in merge_lookup_comrade BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+	
+	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
+	if (IS_ERR(dentry)) {
+		hmdfs_err("flt :: in merge_lookup_comrade lookup_multi_dir FAILED!");
+	} else {
+		tmp_dentry = dentry;
+		p_dentry = tmp_dentry->d_parent;
+		hmdfs_err("flt :: in merge_lookup_comrade AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+		dput(dentry);
 	}
 	
 	comrade = alloc_comrade(path.dentry, devid);
@@ -662,6 +682,14 @@ static int lookup_merge_root(struct inode *root_inode,
 				   &path_dev);
 	if (ret)
 		goto free_buf;
+
+	// tmp_dentry = path_dev.dentry;
+	// p_dentry = tmp_dentry->d_parent;
+	// hmdfs_err("flt :: in lookup_cloud_merge_root BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+	// 	tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+	// 	p_dentry, p_dentry->d_name.name);
+	
+	
 
 	ret = do_lookup_merge_root(path_dev, child_dentry, flags);
 	path_put(&path_dev);
