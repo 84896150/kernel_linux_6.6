@@ -385,7 +385,7 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		if (*end == '/') {
 			start = end + 1;
 		} else {
-			start = end;
+			break;
 		}
 	}
 	return ret_dentry;
