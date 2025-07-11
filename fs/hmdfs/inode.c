@@ -369,13 +369,14 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 	}
 
 	while (*start) {
-		hmdfs_err("flt :: lookup_multi_dir work  ==  %s\n", start);
 		end = strchr(start, '/');
 		if (!end) {
 			end = start + strlen(start);
 		}
+		hmdfs_err("flt :: goto lookup_one_len name = %s, len = %d\n", start, end - start);
 		ret_dentry = lookup_one_len(start, current_dentry, end - start);
 		if (IS_ERR(ret_dentry)) {
+			hmdfs_err("flt :: lookup_one_len failed!");
 			dput(current_dentry);
 			return ret_dentry;
 		}
