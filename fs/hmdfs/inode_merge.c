@@ -958,10 +958,6 @@ int hmdfs_create_lower_dentry(struct inode *i_parent, struct dentry *d_child,
 	char *path_name = NULL;
 	struct path path = { .mnt = NULL, .dentry = NULL };
 	int ret = 0;
-	struct dentry *tmp_dentry = NULL;
-	struct dentry *p_dentry = NULL;
-	struct dentry *dentry = NULL;
-	char *absolute_path_buf_tmp = kmalloc(PATH_MAX, GFP_KERNEL);
 
 	if (unlikely(!path_buf || !absolute_path_buf)) {
 		ret = -ENOMEM;
@@ -981,8 +977,6 @@ int hmdfs_create_lower_dentry(struct inode *i_parent, struct dentry *d_child,
 
 	sprintf(absolute_path_buf, "%s%s/%s", sbi->real_dst, path_name,
 		d_child->d_name.name);
-	sprintf(absolute_path_buf_tmp, "%s/%s", path_name,
-		d_child->d_name.name);
 
 	if (is_dir)
 		lo_d_child = kern_path_create(AT_FDCWD, absolute_path_buf,
@@ -994,42 +988,7 @@ int hmdfs_create_lower_dentry(struct inode *i_parent, struct dentry *d_child,
 		ret = PTR_ERR(lo_d_child);
 		goto out;
 	}
-	tmp_dentry = lo_d_child;
-	p_dentry = tmp_dentry->d_parent;
-	hmdfs_err("flt :: in hmdfs_create_lower_dentry BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
-		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
-		p_dentry, p_dentry->d_name.name);
-
-	if (is_dir)
-		dentry = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf_tmp, LOOKUP_DIRECTORY);
-	else
-		dentry = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf_tmp, 0);
-	if (dentry == NULL || IS_ERR(dentry)) {
-		hmdfs_err("flt :: in hmdfs_create_lower_dentry lookup_multi_dir FAILED!");
-	} else if (d_is_positive(dentry)) {
-		hmdfs_err("flt :: in hmdfs_create_lower_dentry EXIST!");
-		dput(dentry);
-	} else {
-		tmp_dentry = dentry;
-		p_dentry = tmp_dentry->d_parent;
-		hmdfs_err("flt :: in hmdfs_create_lower_dentry AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
-			tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
-			p_dentry, p_dentry->d_name.name);
-		dput(dentry);
-	}
-	kfree(absolute_path_buf_tmp);
 	// to ensure link_comrade after vfs_mkdir succeed
-	tmp_dentry = path.dentry;
-	p_dentry = tmp_dentry->d_parent;
-	hmdfs_err("flt :: in hmdfs_create_lower_dentry goto next 11111 dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
-		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
-		p_dentry, p_dentry->d_name.name);
-	tmp_dentry = lo_d_parent;
-	p_dentry = tmp_dentry->d_parent;
-	hmdfs_err("flt :: in hmdfs_create_lower_dentry goto next 22222 dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
-		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
-		p_dentry, p_dentry->d_name.name);
-
 	ret = hmdfs_do_ops_merge(i_parent, d_child, lo_d_child, path,
 				 rec_op_para);
 	if (ret)
