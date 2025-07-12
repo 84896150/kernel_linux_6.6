@@ -217,22 +217,21 @@ void assign_comrades_unlocked(struct dentry *child_dentry,
 	mutex_unlock(&cdi->comrade_list_lock);
 }
 
-struct hmdfs_dentry_comrade *lookup_comrade(struct path lower_path,
+struct hmdfs_dentry_comrade *lookup_comrade(struct dentry *lower_dentry,
 					    const char *d_name,
 					    int dev_id,
 					    unsigned int flags)
 {
-	struct path path;
+	struct dentry *dentry = NULL;
 	struct hmdfs_dentry_comrade *comrade = NULL;
-	int err;
 
-	err = vfs_path_lookup(lower_path.dentry, lower_path.mnt, d_name, flags,
-			      &path);
-	if (err)
-		return ERR_PTR(err);
+	dentry = lookup_multi_dir(lower_dentry, d_name, flags);
+	if (dentry == NULL || IS_ERR(dentry)) {
+		return ERR_PTR(PTR_ERR(dentry));
+	}
 
-	comrade = alloc_comrade(path.dentry, dev_id);
-	path_put(&path);
+	comrade = alloc_comrade(dentry, dev_id);
+	dput(dentry);
 	return comrade;
 }
 
@@ -346,28 +345,24 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 	struct hmdfs_sb_info *sbi, const char *name, int devid,
 	unsigned int flags)
 {
-	int err;
-	struct path root, path;
+	struct dentry *dentry = NULL;
 	struct hmdfs_dentry_comrade *comrade = NULL;
 	const struct cred *old_cred = hmdfs_override_creds(sbi->cred);
 
-	err = kern_path(sbi->real_dst, LOOKUP_DIRECTORY, &root);
-	if (err) {
-		comrade = ERR_PTR(err);
+	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
+	if (dentry == NULL || IS_ERR(dentry)) {
+        if (dentry == NULL) {
+            hmdfs_err("flt :: dentry == NULL");
+        } else {
+            hmdfs_err("flt :: dentry_err = %d", PTR_ERR(dentry));
+        }
+		comrade = ERR_PTR(PTR_ERR(dentry));
 		goto out;
 	}
 
-	err = vfs_path_lookup(root.dentry, root.mnt, name, flags, &path);
-	if (err) {
-		comrade = ERR_PTR(err);
-		goto root_put;
-	}
+	comrade = alloc_comrade(dentry, devid);
+	dput(dentry);
 	
-	comrade = alloc_comrade(path.dentry, devid);
-
-	path_put(&path);
-root_put:
-	path_put(&root);
 out:
 	hmdfs_revert_creds(old_cred);
 	return comrade;
@@ -550,7 +545,7 @@ out:
  * It's common for a network filesystem to incur various of faults, so we
  * intent to show mercy for faults here, except faults reported by the local.
  */
-static int do_lookup_merge_root(struct path path_dev,
+static int do_lookup_merge_root(struct dentry *dentry_dev,
 				struct dentry *child_dentry, unsigned int flags)
 {
 	struct hmdfs_sb_info *sbi = hmdfs_sb(child_dentry->d_sb);
@@ -567,7 +562,7 @@ static int do_lookup_merge_root(struct path path_dev,
 
 	// lookup real_dst/device_view/local
 	memcpy(buf, DEVICE_VIEW_LOCAL, sizeof(DEVICE_VIEW_LOCAL));
-	comrade = lookup_comrade(path_dev, buf, HMDFS_DEVID_LOCAL, flags);
+	comrade = lookup_comrade(dentry_dev, buf, HMDFS_DEVID_LOCAL, flags);
 	if (IS_ERR(comrade)) {
 		ret = PTR_ERR(comrade);
 		goto out;
@@ -579,7 +574,7 @@ static int do_lookup_merge_root(struct path path_dev,
 	list_for_each_entry(peer, &sbi->connections.node_list, list) {
 		mutex_unlock(&sbi->connections.node_lock);
 		memcpy(buf, peer->cid, HMDFS_CID_SIZE);
-		comrade = lookup_comrade(path_dev, buf, peer->device_id, flags);
+		comrade = lookup_comrade(dentry_dev, buf, peer->device_id, flags);
 		if (IS_ERR(comrade))
 			continue;
 
@@ -641,33 +636,21 @@ static int lookup_merge_root(struct inode *root_inode,
 			     struct dentry *child_dentry, unsigned int flags)
 {
 	struct hmdfs_sb_info *sbi = hmdfs_sb(child_dentry->d_sb);
-	struct path path_dev;
+	struct dentry *dentry_dev = NULL;
 	int ret = -ENOENT;
-	int buf_len;
-	char *buf = NULL;
 	bool locked, down;
 
-	// consider additional one slash and one '\0'
-	buf_len = strlen(sbi->real_dst) + 1 + sizeof(DEVICE_VIEW_ROOT);
-	if (buf_len > PATH_MAX)
-		return -ENAMETOOLONG;
-
-	buf = kmalloc(buf_len, GFP_KERNEL);
-	if (unlikely(!buf))
-		return -ENOMEM;
-
-	sprintf(buf, "%s/%s", sbi->real_dst, DEVICE_VIEW_ROOT);
 	lock_root_inode_shared(root_inode, &locked, &down);
-	ret = hmdfs_get_path_in_sb(child_dentry->d_sb, buf, LOOKUP_DIRECTORY,
-				   &path_dev);
-	if (ret)
-		goto free_buf;
+	dentry_dev = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
+	if (dentry_dev == NULL || IS_ERR(dentry_dev)) {
+		ret = PTR_ERR(dentry_dev);
+		goto out;
+	}
 
-	ret = do_lookup_merge_root(path_dev, child_dentry, flags);
-	path_put(&path_dev);
+	ret = do_lookup_merge_root(dentry_dev, child_dentry, flags);
+	dput(dentry_dev);
 
-free_buf:
-	kfree(buf);
+out:
 	restore_root_inode_sem(root_inode, locked, down);
 	return ret;
 }
