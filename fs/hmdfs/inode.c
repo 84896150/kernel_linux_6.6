@@ -387,5 +387,8 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		}
         start = end;
 	}
+    if (ret_dentry == NULL) {
+        ret_dentry = ERR_PTR(ENOENT);
+    }
 	return ret_dentry;
 }
