@@ -355,22 +355,7 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 	struct dentry *dentry = NULL;
 
 	hmdfs_err("flt :: init merge_lookup_comrade, name = %s\n", name);
-	err = kern_path(sbi->real_dst, LOOKUP_DIRECTORY, &root);
-	if (err) {
-		comrade = ERR_PTR(err);
-		goto out;
-	}
 
-	err = vfs_path_lookup(root.dentry, root.mnt, name, flags, &path);
-	if (err) {
-		comrade = ERR_PTR(err);
-		goto root_put;
-	}
-	tmp_dentry = path.dentry;
-	p_dentry = tmp_dentry->d_parent;
-	hmdfs_err("flt :: in merge_lookup_comrade BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
-		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
-		p_dentry, p_dentry->d_name.name);
 	
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
 	if (dentry == NULL || IS_ERR(dentry)) {
@@ -392,6 +377,21 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 		p_dentry, p_dentry->d_name.name);
 	}
 	
+	err = kern_path(sbi->real_dst, LOOKUP_DIRECTORY, &root);
+	if (err) {
+		hmdfs("flt :: original kern_path!");
+	}
+
+	err = vfs_path_lookup(root.dentry, root.mnt, name, flags, &path);
+	if (err) {
+		hmdfs("flt :: original lookup failed!");
+	}
+	tmp_dentry = path.dentry;
+	p_dentry = tmp_dentry->d_parent;
+	hmdfs_err("flt :: in merge_lookup_comrade BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+
 	comrade = alloc_comrade(dentry, devid);
 
     dput(dentry);
