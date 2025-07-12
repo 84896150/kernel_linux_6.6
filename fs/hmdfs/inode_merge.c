@@ -995,10 +995,6 @@ int hmdfs_create_lower_dentry(struct inode *i_parent, struct dentry *d_child,
 	char *path_name = NULL;
 	struct path path = { .mnt = NULL, .dentry = NULL };
 	int ret = 0;
-	struct dentry *tmp_dentry = NULL;
-	struct dentry *p_dentry = NULL;
-	struct dentry *dentry = NULL;
-	char *absolute_path_buf_tmp = kmalloc(PATH_MAX, GFP_KERNEL);
 
 	if (unlikely(!path_buf || !absolute_path_buf)) {
 		ret = -ENOMEM;
@@ -1017,8 +1013,6 @@ int hmdfs_create_lower_dentry(struct inode *i_parent, struct dentry *d_child,
 	}
 
 	sprintf(absolute_path_buf, "%s%s/%s", sbi->real_dst, path_name,
-		d_child->d_name.name);
-	sprintf(absolute_path_buf_tmp, "%s/%s", path_name,
 		d_child->d_name.name);
 
 	if (is_dir)
