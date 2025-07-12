@@ -676,6 +676,9 @@ static int lookup_merge_root(struct inode *root_inode,
 	int buf_len;
 	char *buf = NULL;
 	bool locked, down;
+	struct dentry *tmp_dentry = NULL;
+	struct dentry *p_dentry = NULL;
+	struct dentry *dentry = NULL;
 
 	// consider additional one slash and one '\0'
 	buf_len = strlen(sbi->real_dst) + 1 + sizeof(DEVICE_VIEW_ROOT);
@@ -692,6 +695,28 @@ static int lookup_merge_root(struct inode *root_inode,
 				   &path_dev);
 	if (ret)
 		goto free_buf;
+    	tmp_dentry = path_dev.dentry;
+	p_dentry = tmp_dentry->d_parent;
+	hmdfs_err("flt :: in lookup_merge_root BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+	tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+	p_dentry, p_dentry->d_name.name);
+	
+	dentry = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
+	if (dentry == NULL || IS_ERR(dentry)) {
+		hmdfs_err("flt :: in lookup_merge_root lookup_multi_dir FAILED!");
+		if (dentry == NULL) {
+			hmdfs_err("flt :: dentry == NULL");
+		} else {
+			hmdfs_err("flt :: IS_ERR(dentry)");
+		}
+	} else {
+		tmp_dentry = dentry;
+		p_dentry = tmp_dentry->d_parent;
+		hmdfs_err("flt :: in lookup_merge_root AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+            tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+            p_dentry, p_dentry->d_name.name);
+        dput(dentry);
+	}
 
 	ret = do_lookup_merge_root(path_dev, child_dentry, flags);
 	path_put(&path_dev);
