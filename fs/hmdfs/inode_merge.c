@@ -346,58 +346,24 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 	struct hmdfs_sb_info *sbi, const char *name, int devid,
 	unsigned int flags)
 {
-	int err;
-	struct path root, path;
+	struct dentry *dentry = NULL;
 	struct hmdfs_dentry_comrade *comrade = NULL;
 	const struct cred *old_cred = hmdfs_override_creds(sbi->cred);
-	struct dentry *tmp_dentry = NULL;
-	struct dentry *p_dentry = NULL;
-	struct dentry *dentry = NULL;
 
-	hmdfs_err("flt :: init merge_lookup_comrade, name = %s\n", name);
-
-	
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
 	if (dentry == NULL || IS_ERR(dentry)) {
-		hmdfs_err("flt :: in merge_lookup_comrade lookup_multi_dir FAILED!");
-		if (dentry == NULL) {
-			hmdfs_err("flt :: dentry == NULL");
-		} else {
-			hmdfs_err("flt :: IS_ERR(dentry)");
-		}
-        dput(dentry);
-        path_put(&root);
-        path_put(&path);
-        return ERR_PTR(PTR_ERR(dentry));
-	} else {
-		tmp_dentry = dentry;
-		p_dentry = tmp_dentry->d_parent;
-		hmdfs_err("flt :: in merge_lookup_comrade AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
-		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
-		p_dentry, p_dentry->d_name.name);
+        if (dentry == NULL) {
+            hmdfs_err("flt :: dentry == NULL");
+        } else {
+            hmdfs_err("flt :: dentry_err = %d", PTR_ERR(dentry));
+        }
+		comrade = ERR_PTR(PTR_ERR(dentry));
+		goto out;
 	}
-	
-	err = kern_path(sbi->real_dst, LOOKUP_DIRECTORY, &root);
-	if (err) {
-		hmdfs("flt :: original kern_path!");
-	}
-
-	err = vfs_path_lookup(root.dentry, root.mnt, name, flags, &path);
-	if (err) {
-		hmdfs("flt :: original lookup failed!");
-	}
-	tmp_dentry = path.dentry;
-	p_dentry = tmp_dentry->d_parent;
-	hmdfs_err("flt :: in merge_lookup_comrade BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
-		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
-		p_dentry, p_dentry->d_name.name);
 
 	comrade = alloc_comrade(dentry, devid);
-
-    dput(dentry);
-	path_put(&path);
-root_put:
-	path_put(&root);
+	dput(dentry);
+	
 out:
 	hmdfs_revert_creds(old_cred);
 	return comrade;
