@@ -225,6 +225,9 @@ struct hmdfs_dentry_comrade *lookup_comrade(struct path lower_path,
 	struct path path;
 	struct hmdfs_dentry_comrade *comrade = NULL;
 	int err;
+	struct dentry *tmp_dentry = NULL;
+	struct dentry *p_dentry = NULL;
+	struct dentry *dentry = NULL;
 
 	err = vfs_path_lookup(lower_path.dentry, lower_path.mnt, d_name, flags,
 			      &path);
