@@ -244,9 +244,6 @@ struct hmdfs_dentry_comrade *lookup_comrade(struct path lower_path,
 		} else {
 			hmdfs_err("flt :: IS_ERR(dentry)");
 		}
-        dput(dentry);
-        path_put(&path);
-        return ERR_PTR(PTR_ERR(dentry));
 	} else {
 		tmp_dentry = dentry;
 		p_dentry = tmp_dentry->d_parent;
