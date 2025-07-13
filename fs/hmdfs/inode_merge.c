@@ -230,7 +230,31 @@ struct hmdfs_dentry_comrade *lookup_comrade(struct path lower_path,
 			      &path);
 	if (err)
 		return ERR_PTR(err);
-
+	tmp_dentry = path.dentry;
+	p_dentry = tmp_dentry->d_parent;
+	hmdfs_err("flt :: in lookup_comrade BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+	
+	dentry = lookup_multi_dir(lower_path.dentry, d_name, flags);
+	if (dentry == NULL || IS_ERR(dentry)) {
+		hmdfs_err("flt :: in lookup_comrade lookup_multi_dir FAILED!");
+		if (dentry == NULL) {
+			hmdfs_err("flt :: dentry == NULL");
+		} else {
+			hmdfs_err("flt :: IS_ERR(dentry)");
+		}
+        dput(dentry);
+        path_put(&path);
+        return ERR_PTR(PTR_ERR(dentry));
+	} else {
+		tmp_dentry = dentry;
+		p_dentry = tmp_dentry->d_parent;
+		hmdfs_err("flt :: in lookup_comrade AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+            tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+            p_dentry, p_dentry->d_name.name);
+        dput(dentry);
+	}
 	comrade = alloc_comrade(path.dentry, dev_id);
 	path_put(&path);
 	return comrade;
