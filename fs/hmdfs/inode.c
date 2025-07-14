@@ -370,25 +370,26 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		dget(root_dentry);
 	}
 
-	while (*start) {
-		end = strchr(start, '/');
-		if (!end) {
-			end = start + strlen(start);
+    while (*start) {
+		if (*start == '/') {
+			start = start + 1;
+			continue;
 		}
+		end = strchr(start, '/');
+		if (!end) 
+			end = start + strlen(start);
 		ret_dentry = lookup_one_len(start, current_dentry, end - start);
-        if (d_is_negative(ret_dentry)){
-            ret_dentry = ERR_PTR(-ENOENT);
-        }
+		if (d_is_negative(ret_dentry)) {
+			dput(ret_dentry);
+			ret_dentry = ERR_PTR(-ENOENT);
+		}
 		if (IS_ERR(ret_dentry)) {
 			dput(current_dentry);
 			return ret_dentry;
 		}
 		dput(current_dentry);
 		current_dentry = ret_dentry;
-		while (*end == '/') {
-			end = end + 1;
-		}
-        start = end;
+		start = end;
 	}
 	return ret_dentry;
 }
