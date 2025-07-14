@@ -379,10 +379,6 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		if (!end) 
 			end = start + strlen(start);
 		ret_dentry = lookup_one_len(start, current_dentry, end - start);
-		if (d_is_negative(ret_dentry)) {
-			dput(ret_dentry);
-			ret_dentry = ERR_PTR(-ENOENT);
-		}
 		if (IS_ERR(ret_dentry)) {
 			dput(current_dentry);
 			return ret_dentry;
