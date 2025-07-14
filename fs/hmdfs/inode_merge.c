@@ -240,6 +240,10 @@ struct hmdfs_dentry_comrade *lookup_comrade(struct path lower_path,
 		p_dentry, p_dentry->d_name.name);
 	
 	dentry = lookup_multi_dir(lower_path.dentry, d_name, flags);
+    if (d_is_negative(dentry)) {
+		dput(dentry);
+		dentry = ERR_PTR(-ENOENT);
+	}
 	if (dentry == NULL || IS_ERR(dentry)) {
 		hmdfs_err("flt :: in lookup_comrade lookup_multi_dir FAILED!");
 		if (dentry == NULL) {
@@ -399,6 +403,10 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 		p_dentry, p_dentry->d_name.name);
 	
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
+	if (d_is_negative(dentry)) {
+		dput(dentry);
+		dentry = ERR_PTR(-ENOENT);
+	}
 	if (dentry == NULL || IS_ERR(dentry)) {
 		hmdfs_err("flt :: in merge_lookup_comrade lookup_multi_dir FAILED!");
 		if (dentry == NULL) {
@@ -729,6 +737,10 @@ static int lookup_merge_root(struct inode *root_inode,
 	p_dentry, p_dentry->d_name.name);
 	
 	dentry = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
+	if (d_is_negative(dentry)) {
+		dput(dentry);
+		dentry = ERR_PTR(-ENOENT);
+	}
 	if (dentry == NULL || IS_ERR(dentry)) {
 		hmdfs_err("flt :: in lookup_merge_root lookup_multi_dir FAILED!");
 		if (dentry == NULL) {
