@@ -250,7 +250,8 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 	}
     if (d_is_negative(dentry_dev)) {
 		dput(dentry_dev);
-		return ERR_PTR(-ENOENT);
+		ret = -ENOENT;
+        goto out;
 	}
 
 	ret = do_lookup_cloud_merge_root(dentry_dev, child_dentry, flags);
