@@ -19,6 +19,25 @@
 #include "authority/authentication.h"
 #include "hmdfs_trace.h"
 
+struct hmdfs_dentry_comrade *cloud_lookup_comrade(struct path lower_path,
+					    const char *d_name,
+					    int dev_id,
+					    unsigned int flags)
+{
+	struct path path;
+	struct hmdfs_dentry_comrade *comrade = NULL;
+	int err;
+
+	err = vfs_path_lookup(lower_path.dentry, lower_path.mnt, d_name, flags,
+			      &path);
+	if (err)
+		return ERR_PTR(err);
+
+	comrade = alloc_comrade(path.dentry, dev_id);
+	path_put(&path);
+	return comrade;
+}
+
 static struct inode *fill_inode_merge(struct super_block *sb,
 				      struct inode *parent_inode,
 				      struct dentry *child_dentry,
@@ -217,7 +236,7 @@ static int do_lookup_cloud_merge_root(struct path path_dev,
 
 	// lookup real_dst/device_view/local
 	memcpy(buf, DEVICE_VIEW_LOCAL, sizeof(DEVICE_VIEW_LOCAL));
-	comrade = lookup_comrade(path_dev, buf, HMDFS_DEVID_LOCAL, flags);
+	comrade = cloud_lookup_comrade(path_dev, buf, HMDFS_DEVID_LOCAL, flags);
 	if (IS_ERR(comrade)) {
 		ret = PTR_ERR(comrade);
 		goto out;
@@ -226,7 +245,7 @@ static int do_lookup_cloud_merge_root(struct path path_dev,
 
 	memcpy(buf, CLOUD_CID, 6);
 	buf[5] = '\0';
-	comrade = lookup_comrade(path_dev, buf, CLOUD_DEVICE, flags);
+	comrade = cloud_lookup_comrade(path_dev, buf, CLOUD_DEVICE, flags);
 	if (IS_ERR(comrade)) {
 		ret = 0;
 		goto out;
