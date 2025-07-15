@@ -97,6 +97,7 @@ cloud_merge_lookup_comrade(struct hmdfs_sb_info *sbi,
 	struct dentry *dentry = NULL;
 	struct hmdfs_dentry_comrade *comrade = NULL;
 
+    name[strlen(name)] = '\0';
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
 	if (dentry == NULL || IS_ERR(dentry)) {
 		return ERR_PTR(PTR_ERR(dentry));
