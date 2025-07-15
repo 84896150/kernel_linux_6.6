@@ -19,6 +19,25 @@
 #include "authority/authentication.h"
 #include "hmdfs_trace.h"
 
+struct hmdfs_dentry_comrade *cloud_lookup_comrade(struct path lower_path,
+					    const char *d_name,
+					    int dev_id,
+					    unsigned int flags)
+{
+	struct path path;
+	struct hmdfs_dentry_comrade *comrade = NULL;
+	int err;
+
+	err = vfs_path_lookup(lower_path.dentry, lower_path.mnt, d_name, flags,
+			      &path);
+	if (err)
+		return ERR_PTR(err);
+
+	comrade = alloc_comrade(path.dentry, dev_id);
+	path_put(&path);
+	return comrade;
+}
+
 static struct inode *fill_inode_merge(struct super_block *sb,
 				      struct inode *parent_inode,
 				      struct dentry *child_dentry,
@@ -94,20 +113,59 @@ cloud_merge_lookup_comrade(struct hmdfs_sb_info *sbi,
 			   int devid,
 			   unsigned int flags)
 {
-	struct dentry *dentry = NULL;
+	int err;
+	struct path root, path;
 	struct hmdfs_dentry_comrade *comrade = NULL;
+	struct dentry *tmp_dentry = NULL;
+	struct dentry *p_dentry = NULL;
+	struct dentry *dentry = NULL;
+	err = kern_path(sbi->real_dst, LOOKUP_DIRECTORY, &root);
+	if (err) {
+		comrade = ERR_PTR(err);
+		goto out;
+	}
 
+	err = vfs_path_lookup(root.dentry, root.mnt, name, flags, &path);
+	if (err) {
+		comrade = ERR_PTR(err);
+		goto root_put;
+	}
+	tmp_dentry = path.dentry;
+	p_dentry = tmp_dentry->d_parent;
+	hmdfs_err("flt :: in cloud_merge_lookup_comrade BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+	
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
 	if (dentry == NULL || IS_ERR(dentry)) {
-		return ERR_PTR(PTR_ERR(dentry));
-	}
-    if (d_is_negative(dentry)) {
+		hmdfs_err("flt :: in cloud_merge_lookup_comrade lookup_multi_dir FAILED!");
+		if (dentry == NULL) {
+			hmdfs_err("flt :: dentry == NULL");
+		} else {
+			hmdfs_err("flt :: IS_ERR(dentry)");
+		}
+        path_put(&path);
+        path_put(&root);
+        return ERR_PTR(-EINVAL);
+	} else if (d_is_negative(dentry)) {
 		dput(dentry);
-		return ERR_PTR(-ENOENT);
+        hmdfs_err("flt :: d_is_negative(dentry)");
+        path_put(&path);
+        path_put(&root);
+        return ERR_PTR(-ENOENT);
+	} else {
+		tmp_dentry = dentry;
+		p_dentry = tmp_dentry->d_parent;
+		hmdfs_err("flt :: in cloud_merge_lookup_comrade AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+            tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+            p_dentry, p_dentry->d_name.name);
 	}
-
 	comrade = alloc_comrade(dentry, devid);
-	dput(dentry);
+    dput(dentry);
+	path_put(&path);
+root_put:
+	path_put(&root);
+out:
 	return comrade;
 }
 
@@ -194,7 +252,7 @@ out:
  * It's common for a network filesystem to incur various of faults, so we
  * intent to show mercy for faults here, except faults reported by the local.
  */
-static int do_lookup_cloud_merge_root(struct dentry *dentry_dev,
+static int do_lookup_cloud_merge_root(struct path path_dev,
 				struct dentry *child_dentry, unsigned int flags)
 {
 	struct hmdfs_dentry_comrade *comrade;
@@ -209,7 +267,7 @@ static int do_lookup_cloud_merge_root(struct dentry *dentry_dev,
 
 	// lookup real_dst/device_view/local
 	memcpy(buf, DEVICE_VIEW_LOCAL, sizeof(DEVICE_VIEW_LOCAL));
-	comrade = lookup_comrade(dentry_dev, buf, HMDFS_DEVID_LOCAL, flags);
+	comrade = cloud_lookup_comrade(path_dev, buf, HMDFS_DEVID_LOCAL, flags);
 	if (IS_ERR(comrade)) {
 		ret = PTR_ERR(comrade);
 		goto out;
@@ -218,7 +276,7 @@ static int do_lookup_cloud_merge_root(struct dentry *dentry_dev,
 
 	memcpy(buf, CLOUD_CID, 6);
 	buf[5] = '\0';
-	comrade = lookup_comrade(dentry_dev, buf, CLOUD_DEVICE, flags);
+	comrade = cloud_lookup_comrade(path_dev, buf, CLOUD_DEVICE, flags);
 	if (IS_ERR(comrade)) {
 		ret = 0;
 		goto out;
@@ -238,26 +296,61 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 			     struct dentry *child_dentry, unsigned int flags)
 {
 	struct hmdfs_sb_info *sbi = hmdfs_sb(child_dentry->d_sb);
-	struct dentry *dentry_dev = NULL;
+	struct path path_dev;
 	int ret = -ENOENT;
+	int buf_len;
+	char *buf = NULL;
 	bool locked, down;
+	struct dentry *tmp_dentry = NULL;
+	struct dentry *p_dentry = NULL;
+	struct dentry *dentry = NULL;
 
+	// consider additional one slash and one '\0'
+	buf_len = strlen(sbi->real_dst) + 1 + sizeof(DEVICE_VIEW_ROOT);
+	if (buf_len > PATH_MAX)
+		return -ENAMETOOLONG;
+
+	buf = kmalloc(buf_len, GFP_KERNEL);
+	if (unlikely(!buf))
+		return -ENOMEM;
+
+	sprintf(buf, "%s/%s", sbi->real_dst, DEVICE_VIEW_ROOT);
 	lock_root_inode_shared(root_inode, &locked, &down);
-	dentry_dev = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
-	if (dentry_dev == NULL || IS_ERR(dentry_dev)) {
-		ret = PTR_ERR(dentry_dev);
-		goto out;
-	}
-    if (d_is_negative(dentry_dev)) {
-		dput(dentry_dev);
-		ret = -ENOENT;
-        goto out;
+	ret = hmdfs_get_path_in_sb(child_dentry->d_sb, buf, LOOKUP_DIRECTORY,
+				   &path_dev);
+	if (ret)
+		goto free_buf;
+    tmp_dentry = path_dev.dentry;
+	p_dentry = tmp_dentry->d_parent;
+	hmdfs_err("flt :: in cloud_merge_lookup_comrade BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+		p_dentry, p_dentry->d_name.name);
+	
+	dentry = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
+	if (dentry == NULL || IS_ERR(dentry)) {
+		hmdfs_err("flt :: in cloud_merge_lookup_comrade lookup_multi_dir FAILED!");
+		if (dentry == NULL) {
+			hmdfs_err("flt :: dentry == NULL");
+		} else {
+			hmdfs_err("flt :: IS_ERR(dentry)");
+		}
+	} else if (d_is_negative(dentry)) {
+		dput(dentry);
+        hmdfs_err("flt :: d_is_negative(dentry)");
+	} else {
+		tmp_dentry = dentry;
+		p_dentry = tmp_dentry->d_parent;
+		hmdfs_err("flt :: in cloud_merge_lookup_comrade AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
+            tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
+            p_dentry, p_dentry->d_name.name);
+        dput(dentry);
 	}
 
-	ret = do_lookup_cloud_merge_root(dentry_dev, child_dentry, flags);
-	dput(dentry_dev);
+	ret = do_lookup_cloud_merge_root(path_dev, child_dentry, flags);
+	path_put(&path_dev);
 
-out:
+free_buf:
+	kfree(buf);
 	restore_root_inode_sem(root_inode, locked, down);
 	return ret;
 }
