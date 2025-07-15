@@ -383,6 +383,11 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 			dput(current_dentry);
 			return ret_dentry;
 		}
+		if (d_is_negative(ret_dentry)) {
+			dput(current_dentry);
+			hmdfs_err("flt :: ret_dentry is negative!!!!!!!");
+			return ret_dentry;
+		}
 		dput(current_dentry);
 		current_dentry = ret_dentry;
 		start = end;
