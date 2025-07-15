@@ -113,59 +113,20 @@ cloud_merge_lookup_comrade(struct hmdfs_sb_info *sbi,
 			   int devid,
 			   unsigned int flags)
 {
-	int err;
-	struct path root, path;
-	struct hmdfs_dentry_comrade *comrade = NULL;
-	struct dentry *tmp_dentry = NULL;
-	struct dentry *p_dentry = NULL;
 	struct dentry *dentry = NULL;
-	err = kern_path(sbi->real_dst, LOOKUP_DIRECTORY, &root);
-	if (err) {
-		comrade = ERR_PTR(err);
-		goto out;
+	struct hmdfs_dentry_comrade *comrade = NULL;
+
+	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
+	if (IS_ERR(dentry)) {
+		return ERR_PTR(PTR_ERR(dentry));
+	}
+    if (d_is_negative(dentry)) {
+		dput(dentry);
+		return ERR_PTR(-ENOENT);
 	}
 
-	err = vfs_path_lookup(root.dentry, root.mnt, name, flags, &path);
-	if (err) {
-		comrade = ERR_PTR(err);
-		goto root_put;
-	}
-	tmp_dentry = path.dentry;
-	p_dentry = tmp_dentry->d_parent;
-	hmdfs_err("flt :: in cloud_merge_lookup_comrade BEFORE dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
-		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
-		p_dentry, p_dentry->d_name.name);
-	
-	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
-	if (dentry == NULL || IS_ERR(dentry)) {
-		hmdfs_err("flt :: in cloud_merge_lookup_comrade lookup_multi_dir FAILED!");
-		if (dentry == NULL) {
-			hmdfs_err("flt :: dentry == NULL");
-		} else {
-			hmdfs_err("flt :: IS_ERR(dentry)");
-		}
-        path_put(&path);
-        path_put(&root);
-        return ERR_PTR(-EINVAL);
-	} else if (d_is_negative(dentry)) {
-		dput(dentry);
-        hmdfs_err("flt :: d_is_negative(dentry)");
-        path_put(&path);
-        path_put(&root);
-        return ERR_PTR(-ENOENT);
-	} else {
-		tmp_dentry = dentry;
-		p_dentry = tmp_dentry->d_parent;
-		hmdfs_err("flt :: in cloud_merge_lookup_comrade AFTER dentry_name = %s, node = %lu, d_parent = %x, parent_name = %s",
-            tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
-            p_dentry, p_dentry->d_name.name);
-	}
 	comrade = alloc_comrade(dentry, devid);
-    dput(dentry);
-	path_put(&path);
-root_put:
-	path_put(&root);
-out:
+	dput(dentry);
 	return comrade;
 }
 
@@ -327,13 +288,8 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 		p_dentry, p_dentry->d_name.name);
 	
 	dentry = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
-	if (dentry == NULL || IS_ERR(dentry)) {
+	if (IS_ERR(dentry)) {
 		hmdfs_err("flt :: in cloud_merge_lookup_comrade lookup_multi_dir FAILED!");
-		if (dentry == NULL) {
-			hmdfs_err("flt :: dentry == NULL");
-		} else {
-			hmdfs_err("flt :: IS_ERR(dentry)");
-		}
 	} else if (d_is_negative(dentry)) {
 		dput(dentry);
         hmdfs_err("flt :: d_is_negative(dentry)");
