@@ -321,7 +321,7 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 		tmp_dentry->d_name.name, tmp_dentry->d_inode->i_ino,
 		p_dentry, p_dentry->d_name.name);
 	
-	dentry_dev = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
+	dentry = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
 	if (dentry == NULL || IS_ERR(dentry)) {
 		hmdfs_err("flt :: in cloud_merge_lookup_comrade lookup_multi_dir FAILED!");
 		if (dentry == NULL) {
