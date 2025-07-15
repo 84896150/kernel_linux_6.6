@@ -160,7 +160,7 @@ static int lookup_merge_normal(struct dentry *dentry, unsigned int flags)
 	}
 
 	if (mdi->type != DT_REG || devid == 0) {
-		snprintf(cpath, PATH_MAX, "device_view/local%s/%s\0", ppath,
+		snprintf(cpath, PATH_MAX, "device_view/local%s/%s", ppath,
 			rname);
 		merge_lookup_sync(mdi, sbi, 0, cpath, flags);
 	}
@@ -169,7 +169,7 @@ static int lookup_merge_normal(struct dentry *dentry, unsigned int flags)
 		goto found;
 	}
 
-	snprintf(cpath, PATH_MAX, "device_view/%s%s/%s\0", CLOUD_CID,
+	snprintf(cpath, PATH_MAX, "device_view/%s%s/%s", CLOUD_CID,
 			ppath, rname);
 	merge_lookup_sync(mdi, sbi, CLOUD_DEVICE, cpath, flags);
 
