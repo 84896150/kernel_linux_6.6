@@ -226,8 +226,12 @@ struct hmdfs_dentry_comrade *lookup_comrade(struct dentry *lower_dentry,
 	struct hmdfs_dentry_comrade *comrade = NULL;
 
 	dentry = lookup_multi_dir(lower_dentry, d_name, flags);
-	if (dentry == NULL || IS_ERR(dentry)) {
+	if (IS_ERR(dentry)) {
 		return ERR_PTR(PTR_ERR(dentry));
+	}
+    if (d_is_negative(dentry)) {
+		dput(dentry);
+		return ERR_PTR(-ENOENT);
 	}
 
 	comrade = alloc_comrade(dentry, dev_id);
@@ -350,9 +354,13 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 	const struct cred *old_cred = hmdfs_override_creds(sbi->cred);
 
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
-	if (dentry == NULL || IS_ERR(dentry)) {
+	if (IS_ERR(dentry)) {
 		comrade = ERR_PTR(PTR_ERR(dentry));
 		goto out;
+	}
+    if (d_is_negative(dentry)) {
+		dput(dentry);
+		return ERR_PTR(-ENOENT);
 	}
 
 	comrade = alloc_comrade(dentry, devid);
@@ -637,9 +645,13 @@ static int lookup_merge_root(struct inode *root_inode,
 
 	lock_root_inode_shared(root_inode, &locked, &down);
 	dentry_dev = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
-	if (dentry_dev == NULL || IS_ERR(dentry_dev)) {
+	if (IS_ERR(dentry_dev)) {
 		ret = PTR_ERR(dentry_dev);
 		goto out;
+	}
+    if (d_is_negative(dentry_dev)) {
+		dput(dentry_dev);
+		return ERR_PTR(-ENOENT);
 	}
 
 	ret = do_lookup_merge_root(dentry_dev, child_dentry, flags);
@@ -937,13 +949,13 @@ int hmdfs_create_lower_dentry(struct inode *i_parent, struct dentry *d_child,
 	else
 		lo_d_child = lookup_multi_dir(sbi->sb->s_root, absolute_path_buf, 0);
 
-	if (lo_d_child == NULL == IS_ERR(lo_d_child)) {
+	if (IS_ERR(lo_d_child)) {
 		ret = PTR_ERR(lo_d_child);
 		goto out;
 	}
 	if (d_is_positive(lo_d_child)) {
 		ret = -EEXIST;
-		goto out;
+		goto out_put;
 	}
 	// to ensure link_comrade after vfs_mkdir succeed
 	ret = hmdfs_do_ops_merge(i_parent, d_child, lo_d_child, lo_d_parent, rec_op_para);
@@ -1269,12 +1281,13 @@ int do_rename_merge(struct inode *old_dir, struct dentry *old_dentry,
 		else
 			lo_d_new = lookup_multi_dir(sbi->sb->s_root, abs_path_buf, 0);
 
-		if (lo_d_new == NULL || IS_ERR(lo_d_new)) {
+		if (IS_ERR(lo_d_new)) {
 			ret = PTR_ERR(lo_d_new);
 			goto out;
 		}
 		if (d_is_positive(lo_d_new)) {
 			ret = -EEXIST;
+            dput(lo_d_new);
 			goto out;
 		}
 		lo_d_new_dir = dget_parent(lo_d_new);

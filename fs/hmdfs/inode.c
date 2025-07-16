@@ -370,23 +370,27 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		dget(root_dentry);
 	}
 
-	while (*start) {
-		end = strchr(start, '/');
-		if (!end) {
-			end = start + strlen(start);
+    while (*start) {
+		if (*start == '/') {
+			start = start + 1;
+			continue;
 		}
+		end = strchr(start, '/');
+		if (!end) 
+			end = start + strlen(start);
 		ret_dentry = lookup_one_len(start, current_dentry, end - start);
 		if (IS_ERR(ret_dentry)) {
 			dput(current_dentry);
 			return ret_dentry;
 		}
+		if (d_is_negative(ret_dentry)) {
+			dput(current_dentry);
+			hmdfs_err("flt :: ret_dentry is negative!!!!!!!");
+			return ret_dentry;
+		}
 		dput(current_dentry);
 		current_dentry = ret_dentry;
-		if (*end == '/') {
-			start = end + 1;
-		} else {
-			break;
-		}
+		start = end;
 	}
 	return ret_dentry;
 }
