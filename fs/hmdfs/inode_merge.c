@@ -226,9 +226,8 @@ struct hmdfs_dentry_comrade *lookup_comrade(struct dentry *lower_dentry,
 	struct hmdfs_dentry_comrade *comrade = NULL;
 
 	dentry = lookup_multi_dir(lower_dentry, d_name, flags);
-	if (IS_ERR(dentry)) {
+	if (IS_ERR(dentry))
 		return ERR_PTR(PTR_ERR(dentry));
-	}
     if (d_is_negative(dentry)) {
 		dput(dentry);
 		return ERR_PTR(-ENOENT);

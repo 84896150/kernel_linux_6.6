@@ -366,9 +366,11 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 	const char *start = name;
 	const char *end = NULL;
 
-	if (*start) {
+	while (*start == '/')
+		start = start + 1;
+
+	if (*start)
 		dget(root_dentry);
-	}
 
     while (*start) {
 		if (*start == '/') {
@@ -379,13 +381,8 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		if (!end) 
 			end = start + strlen(start);
 		ret_dentry = lookup_one_len(start, current_dentry, end - start);
-		if (IS_ERR(ret_dentry)) {
+		if (IS_ERR(ret_dentry) || d_is_negative(ret_dentry)) {
 			dput(current_dentry);
-			return ret_dentry;
-		}
-		if (d_is_negative(ret_dentry)) {
-			dput(current_dentry);
-			hmdfs_err("flt :: ret_dentry is negative!!!!!!!");
 			return ret_dentry;
 		}
 		dput(current_dentry);
