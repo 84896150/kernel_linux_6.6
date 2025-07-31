@@ -384,6 +384,7 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		ret_dentry = lookup_one_len(start, current_dentry, end - start);
 		if (IS_ERR(ret_dentry) || d_is_negative(ret_dentry)) {
 			dput(current_dentry);
+			inode_unlock(current_dentry->d_inode);
 			return ret_dentry;
 		}
 		dput(current_dentry);
@@ -391,7 +392,8 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		current_dentry = ret_dentry;
 		start = end;
 	}
-	if (flags & LOOKUP_DIRECTORY && !d_can_lookup(ret_dentry))
+	if (flags & LOOKUP_DIRECTORY && ret_dentry != NULL &&
+		!d_can_lookup(ret_dentry))
 		return -ENOTDIR;
 	return ret_dentry;
 }
