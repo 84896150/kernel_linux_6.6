@@ -227,7 +227,7 @@ struct hmdfs_dentry_comrade *lookup_comrade(struct dentry *lower_dentry,
 
 	dentry = lookup_multi_dir(lower_dentry, d_name, flags);
 	if (IS_ERR(dentry))
-		return ERR_PTR(PTR_ERR(dentry));
+		return ERR_CAST(dentry);
     if (d_is_negative(dentry)) {
 		dput(dentry);
 		return ERR_PTR(-ENOENT);
@@ -354,7 +354,7 @@ static struct hmdfs_dentry_comrade *merge_lookup_comrade(
 
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
 	if (IS_ERR(dentry)) {
-		comrade = ERR_PTR(PTR_ERR(dentry));
+		comrade = ERR_CAST(dentry);
 		goto out;
 	}
     if (d_is_negative(dentry)) {
@@ -956,20 +956,23 @@ int hmdfs_create_lower_dentry(struct inode *i_parent, struct dentry *d_child,
 		ret = -EEXIST;
 		goto out_put;
 	}
+	inode_lock(lo_d_parent->d_inode);
 	// to ensure link_comrade after vfs_mkdir succeed
 	ret = hmdfs_do_ops_merge(i_parent, d_child, lo_d_child, lo_d_parent, rec_op_para);
 	if (ret)
-		goto out_put;
+		goto unlock;
 	new_comrade = alloc_comrade(lo_d_child, HMDFS_DEVID_LOCAL);
 	if (IS_ERR(new_comrade)) {
 		ret = PTR_ERR(new_comrade);
-		goto out_put;
+		goto unlock;
 	} else {
 		link_comrade_unlocked(d_child, new_comrade);
 	}
 
 	update_inode_attr(d_inode(d_child), d_child);
 
+unlock:
+	inode_unlock(lo_d_parent->d_inode);
 out_put:
 	dput(lo_d_child);
 out:
@@ -1282,11 +1285,6 @@ int do_rename_merge(struct inode *old_dir, struct dentry *old_dentry,
 
 		if (IS_ERR(lo_d_new)) {
 			ret = PTR_ERR(lo_d_new);
-			goto out;
-		}
-		if (d_is_positive(lo_d_new)) {
-			ret = -EEXIST;
-            dput(lo_d_new);
 			goto out;
 		}
 		lo_d_new_dir = dget_parent(lo_d_new);

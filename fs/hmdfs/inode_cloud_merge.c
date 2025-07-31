@@ -99,7 +99,7 @@ cloud_merge_lookup_comrade(struct hmdfs_sb_info *sbi,
 
 	dentry = lookup_multi_dir(sbi->sb->s_root, name, flags);
 	if (IS_ERR(dentry))
-		return ERR_PTR(PTR_ERR(dentry));
+		return ERR_CAST(dentry);
     if (d_is_negative(dentry)) {
 		dput(dentry);
 		return ERR_PTR(-ENOENT);
@@ -241,23 +241,17 @@ static int lookup_cloud_merge_root(struct inode *root_inode,
 	int ret = -ENOENT;
 	bool locked, down;
 
-	lock_root_inode_shared(root_inode, &locked, &down);
 	dentry_dev = lookup_multi_dir(sbi->sb->s_root, DEVICE_VIEW_ROOT, flags);
-	if (IS_ERR(dentry_dev)) {
-		ret = PTR_ERR(dentry_dev);
-		goto out;
-	}
+	if (IS_ERR(dentry_dev))
+		return PTR_ERR(dentry_dev);
     if (d_is_negative(dentry_dev)) {
 		dput(dentry_dev);
-		ret = -ENOENT;
-        goto out;
+		return -ENOENT;
 	}
 
 	ret = do_lookup_cloud_merge_root(dentry_dev, child_dentry, flags);
 	dput(dentry_dev);
 
-out:
-	restore_root_inode_sem(root_inode, locked, down);
 	return ret;
 }
 
@@ -471,20 +465,23 @@ int hmdfs_create_lower_cloud_dentry(struct inode *i_parent, struct dentry *d_chi
 		ret = -EEXIST;
 		goto out_put;
 	}
+	inode_lock(lo_d_parent->d_inode);
 	// to ensure link_comrade after vfs_mkdir succeed
 	ret = hmdfs_do_ops_cloud_merge(i_parent, d_child, lo_d_child, lo_d_parent, rec_op_para);
 	if (ret)
-		goto out_put;
+		goto unlock;
 	new_comrade = alloc_comrade(lo_d_child, HMDFS_DEVID_LOCAL);
 	if (IS_ERR(new_comrade)) {
 		ret = PTR_ERR(new_comrade);
-		goto out_put;
+		goto unlock;
 	} else {
 		link_comrade_unlocked(d_child, new_comrade);
 	}
 
 	update_inode_attr(d_inode(d_child), d_child);
 
+unlock:
+	inode_unlock(lo_d_parent->d_inode);
 out_put:
 	dput(lo_d_child);
 out:

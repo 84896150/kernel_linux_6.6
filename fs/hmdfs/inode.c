@@ -380,14 +380,18 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		end = strchr(start, '/');
 		if (!end) 
 			end = start + strlen(start);
+		inode_lock(current_dentry->d_inode);
 		ret_dentry = lookup_one_len(start, current_dentry, end - start);
 		if (IS_ERR(ret_dentry) || d_is_negative(ret_dentry)) {
 			dput(current_dentry);
 			return ret_dentry;
 		}
 		dput(current_dentry);
+		inode_unlock(current_dentry->d_inode);
 		current_dentry = ret_dentry;
 		start = end;
 	}
+	if (flags & LOOKUP_DIRECTORY && !d_can_lookup(ret_dentry))
+		return -ENOTDIR;
 	return ret_dentry;
 }
