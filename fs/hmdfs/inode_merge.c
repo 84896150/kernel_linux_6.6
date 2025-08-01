@@ -1301,14 +1301,6 @@ int do_rename_merge(struct inode *old_dir, struct dentry *old_dentry,
 		rename_data.flags = flags;
 		ret = vfs_rename(&rename_data);
 
-		new_comrade = alloc_comrade(lo_d_new_dir, comrade->dev_id);
-		if (IS_ERR(new_comrade)) {
-			ret = PTR_ERR(new_comrade);
-			goto no_comrade;
-		}
-
-		link_comrade_unlocked(new_dentry, new_comrade);
-no_comrade:
 		dput(lo_d_new);
 		dput(lo_d_old_dir);
 		dput(lo_d_new_dir);

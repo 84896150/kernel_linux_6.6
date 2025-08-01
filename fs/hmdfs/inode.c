@@ -383,8 +383,8 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		inode_lock(current_dentry->d_inode);
 		ret_dentry = lookup_one_len(start, current_dentry, end - start);
 		if (IS_ERR(ret_dentry) || d_is_negative(ret_dentry)) {
-			dput(current_dentry);
 			inode_unlock(current_dentry->d_inode);
+			dput(current_dentry);
 			return ret_dentry;
 		}
 		dput(current_dentry);
