@@ -956,7 +956,7 @@ int hmdfs_create_lower_dentry(struct inode *i_parent, struct dentry *d_child,
 		ret = -EEXIST;
 		goto out_put;
 	}
-	inode_lock(lo_d_parent->d_inode);
+	inode_lock(d_inode(lo_d_parent));
 	// to ensure link_comrade after vfs_mkdir succeed
 	ret = hmdfs_do_ops_merge(i_parent, d_child, lo_d_child, lo_d_parent, rec_op_para);
 	if (ret)
@@ -972,7 +972,7 @@ int hmdfs_create_lower_dentry(struct inode *i_parent, struct dentry *d_child,
 	update_inode_attr(d_inode(d_child), d_child);
 
 unlock:
-	inode_unlock(lo_d_parent->d_inode);
+	inode_unlock(d_inode(lo_d_parent));
 out_put:
 	dput(lo_d_child);
 out:
