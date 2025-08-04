@@ -387,8 +387,8 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 			dput(current_dentry);
 			return ret_dentry;
 		}
-		dput(current_dentry);
 		inode_unlock(current_dentry->d_inode);
+		dput(current_dentry);
 		current_dentry = ret_dentry;
 		start = end;
 	}
