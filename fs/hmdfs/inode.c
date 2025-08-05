@@ -381,13 +381,16 @@ struct dentry *lookup_multi_dir(struct dentry *root_dentry,
 		if (!end) 
 			end = start + strlen(start);
 		inode_lock(d_inode(current_dentry));
+		hmdfs_info("flt : lock, name = , path = \n", current_dentry->name.name, start);
 		ret_dentry = lookup_one_len(start, current_dentry, end - start);
 		if (IS_ERR(ret_dentry) || d_is_negative(ret_dentry)) {
 			inode_unlock(d_inode(current_dentry));
+			hmdfs_info("flt : UNlock, name = , path = \n", current_dentry->name.name, start);
 			dput(current_dentry);
 			return ret_dentry;
 		}
 		inode_unlock(d_inode(current_dentry));
+		hmdfs_info("flt : UNlock, name = , path = \n", current_dentry->name.name, start);
 		dput(current_dentry);
 		current_dentry = ret_dentry;
 		start = end;
