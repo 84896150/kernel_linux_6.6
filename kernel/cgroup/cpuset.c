@@ -1229,11 +1229,9 @@ static void update_tasks_cpumask(struct cpuset *cs, struct cpumask *new_cpus)
 
 		if (top_cs) {
 			/*
-			 * PF_NO_SETAFFINITY tasks are ignored.
-			 * All per cpu kthreads should have PF_NO_SETAFFINITY
-			 * flag set, see kthread_set_per_cpu().
+			 * Percpu kthreads in top_cpuset are ignored
 			 */
-			if (task->flags & PF_NO_SETAFFINITY)
+			if (kthread_is_per_cpu(task))
 				continue;
 			cpumask_andnot(new_cpus, possible_mask, cs->subparts_cpus);
 		} else {

@@ -3119,12 +3119,7 @@ void console_unblank(void)
 	 */
 	cookie = console_srcu_read_lock();
 	for_each_console_srcu(c) {
-		short flags = console_srcu_read_flags(c);
-
-		if (flags & CON_SUSPENDED)
-			continue;
-
-		if ((flags & CON_ENABLED) && c->unblank) {
+		if ((console_srcu_read_flags(c) & CON_ENABLED) && c->unblank) {
 			found_unblank = true;
 			break;
 		}
@@ -3161,12 +3156,7 @@ void console_unblank(void)
 
 	cookie = console_srcu_read_lock();
 	for_each_console_srcu(c) {
-		short flags = console_srcu_read_flags(c);
-
-		if (flags & CON_SUSPENDED)
-			continue;
-
-		if ((flags & CON_ENABLED) && c->unblank)
+		if ((console_srcu_read_flags(c) & CON_ENABLED) && c->unblank)
 			c->unblank();
 	}
 	console_srcu_read_unlock(cookie);
