@@ -472,17 +472,16 @@ static int armada_37xx_pmx_gpio_set_direction(struct pinctrl_dev *pctldev,
 {
 	struct armada_37xx_pinctrl *info = pinctrl_dev_get_drvdata(pctldev);
 	struct gpio_chip *chip = range->gc;
-	int ret;
 
 	dev_dbg(info->dev, "gpio_direction for pin %u as %s-%d to %s\n",
 		offset, range->name, offset, input ? "input" : "output");
 
 	if (input)
-		ret = armada_37xx_gpio_direction_input(chip, offset);
+		armada_37xx_gpio_direction_input(chip, offset);
 	else
-		ret = armada_37xx_gpio_direction_output(chip, offset, 0);
+		armada_37xx_gpio_direction_output(chip, offset, 0);
 
-	return ret;
+	return 0;
 }
 
 static int armada_37xx_gpio_request_enable(struct pinctrl_dev *pctldev,
