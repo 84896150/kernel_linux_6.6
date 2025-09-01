@@ -454,9 +454,9 @@ static void mdacon_clear(struct vc_data *c, unsigned int y, unsigned int x,
 	scr_memsetw(dest, eattr, width * 2);
 }
 
-static bool mdacon_switch(struct vc_data *c)
+static int mdacon_switch(struct vc_data *c)
 {
-	return true;	/* redrawing needed */
+	return 1;	/* redrawing needed */
 }
 
 static int mdacon_blank(struct vc_data *c, int blank, int mode_switch)

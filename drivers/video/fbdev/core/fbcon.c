@@ -2072,7 +2072,7 @@ static int fbcon_resize(struct vc_data *vc, unsigned int width,
 	return 0;
 }
 
-static bool fbcon_switch(struct vc_data *vc)
+static int fbcon_switch(struct vc_data *vc)
 {
 	struct fb_info *info, *old_info = NULL;
 	struct fbcon_ops *ops;
@@ -2194,9 +2194,9 @@ static bool fbcon_switch(struct vc_data *vc)
 			      vc->vc_origin + vc->vc_size_row * vc->vc_top,
 			      vc->vc_size_row * (vc->vc_bottom -
 						 vc->vc_top) / 2);
-		return false;
+		return 0;
 	}
-	return true;
+	return 1;
 }
 
 static void fbcon_generic_blank(struct vc_data *vc, struct fb_info *info,

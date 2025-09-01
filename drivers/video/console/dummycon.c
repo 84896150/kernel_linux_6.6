@@ -119,9 +119,9 @@ static bool dummycon_scroll(struct vc_data *vc, unsigned int top,
 	return false;
 }
 
-static bool dummycon_switch(struct vc_data *vc)
+static int dummycon_switch(struct vc_data *vc)
 {
-	return false;
+	return 0;
 }
 
 /*
