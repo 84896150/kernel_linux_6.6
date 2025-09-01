@@ -246,7 +246,7 @@ void libbpf_print(enum libbpf_print_level level, const char *format, ...)
 	old_errno = errno;
 
 	va_start(args, format);
-	print_fn(level, format, args);
+	__libbpf_pr(level, format, args);
 	va_end(args);
 
 	errno = old_errno;
