@@ -21,8 +21,9 @@ EXPORT_SYMBOL(gc_inflight_list);
 DEFINE_SPINLOCK(unix_gc_lock);
 EXPORT_SYMBOL(unix_gc_lock);
 
-struct unix_sock *unix_get_socket(struct file *filp)
+struct sock *unix_get_socket(struct file *filp)
 {
+	struct sock *u_sock = NULL;
 	struct inode *inode = file_inode(filp);
 
 	/* Socket ? */
@@ -33,10 +34,10 @@ struct unix_sock *unix_get_socket(struct file *filp)
 
 		/* PF_UNIX ? */
 		if (s && ops && ops->family == PF_UNIX)
-			return unix_sk(s);
+			u_sock = s;
 	}
 
-	return NULL;
+	return u_sock;
 }
 EXPORT_SYMBOL(unix_get_socket);
 
@@ -45,11 +46,13 @@ EXPORT_SYMBOL(unix_get_socket);
  */
 void unix_inflight(struct user_struct *user, struct file *fp)
 {
-	struct unix_sock *u = unix_get_socket(fp);
+	struct sock *s = unix_get_socket(fp);
 
 	spin_lock(&unix_gc_lock);
 
-	if (u) {
+	if (s) {
+		struct unix_sock *u = unix_sk(s);
+
 		if (!u->inflight) {
 			BUG_ON(!list_empty(&u->link));
 			list_add_tail(&u->link, &gc_inflight_list);
@@ -66,11 +69,13 @@ void unix_inflight(struct user_struct *user, struct file *fp)
 
 void unix_notinflight(struct user_struct *user, struct file *fp)
 {
-	struct unix_sock *u = unix_get_socket(fp);
+	struct sock *s = unix_get_socket(fp);
 
 	spin_lock(&unix_gc_lock);
 
-	if (u) {
+	if (s) {
+		struct unix_sock *u = unix_sk(s);
+
 		BUG_ON(!u->inflight);
 		BUG_ON(list_empty(&u->link));
 
