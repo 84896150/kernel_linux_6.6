@@ -7,7 +7,7 @@ import gdb
 from linux import constants
 from linux import cpus
 from linux import utils
-from linux import mapletree
+from linux import radixtree
 
 irq_desc_type = utils.CachedType("struct irq_desc")
 
@@ -23,12 +23,12 @@ def irqd_is_level(desc):
 def show_irq_desc(prec, irq):
     text = ""
 
-    desc = mapletree.mtree_load(gdb.parse_and_eval("&sparse_irqs"), irq)
+    desc = radixtree.lookup(gdb.parse_and_eval("&irq_desc_tree"), irq)
     if desc is None:
         return text
 
-    desc = desc.cast(irq_desc_type.get_type().pointer())
-    if desc == 0:
+    desc = desc.cast(irq_desc_type.get_type())
+    if desc is None:
         return text
 
     if irq_settings_is_hidden(desc):
@@ -221,8 +221,8 @@ class LxInterruptList(gdb.Command):
             gdb.write("CPU%-8d" % cpu)
         gdb.write("\n")
 
-        if utils.gdb_eval_or_none("&sparse_irqs") is None:
-            raise gdb.GdbError("Unable to find the sparse IRQ tree, is CONFIG_SPARSE_IRQ enabled?")
+        if utils.gdb_eval_or_none("&irq_desc_tree") is None:
+            return
 
         for irq in range(nr_irqs):
             gdb.write(show_irq_desc(prec, irq))
