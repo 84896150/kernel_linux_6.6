@@ -4971,7 +4971,12 @@ static const struct iomap_ops ext4_iomap_xattr_ops = {
 
 static int ext4_fiemap_check_ranges(struct inode *inode, u64 start, u64 *len)
 {
-	u64 maxbytes = ext4_get_maxbytes(inode);
+	u64 maxbytes;
+
+	if (ext4_test_inode_flag(inode, EXT4_INODE_EXTENTS))
+		maxbytes = inode->i_sb->s_maxbytes;
+	else
+		maxbytes = EXT4_SB(inode->i_sb)->s_bitmap_maxbytes;
 
 	if (*len == 0)
 		return -EINVAL;
