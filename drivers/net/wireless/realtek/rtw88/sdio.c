@@ -1223,7 +1223,10 @@ static void rtw_sdio_process_tx_queue(struct rtw_dev *rtwdev,
 		return;
 	}
 
-	rtw_sdio_indicate_tx_status(rtwdev, skb);
+	if (queue <= RTW_TX_QUEUE_VO)
+		rtw_sdio_indicate_tx_status(rtwdev, skb);
+	else
+		dev_kfree_skb_any(skb);
 }
 
 static void rtw_sdio_tx_handler(struct work_struct *work)
