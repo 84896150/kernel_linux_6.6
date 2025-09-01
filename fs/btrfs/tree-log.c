@@ -1504,7 +1504,8 @@ out:
 	return ret;
 }
 
-static int count_inode_extrefs(struct btrfs_inode *inode, struct btrfs_path *path)
+static int count_inode_extrefs(struct btrfs_root *root,
+		struct btrfs_inode *inode, struct btrfs_path *path)
 {
 	int ret = 0;
 	int name_len;
@@ -1518,8 +1519,8 @@ static int count_inode_extrefs(struct btrfs_inode *inode, struct btrfs_path *pat
 	struct extent_buffer *leaf;
 
 	while (1) {
-		ret = btrfs_find_one_extref(inode->root, inode_objectid, offset,
-					    path, &extref, &offset);
+		ret = btrfs_find_one_extref(root, inode_objectid, offset, path,
+					    &extref, &offset);
 		if (ret)
 			break;
 
@@ -1547,7 +1548,8 @@ static int count_inode_extrefs(struct btrfs_inode *inode, struct btrfs_path *pat
 	return nlink;
 }
 
-static int count_inode_refs(struct btrfs_inode *inode, struct btrfs_path *path)
+static int count_inode_refs(struct btrfs_root *root,
+			struct btrfs_inode *inode, struct btrfs_path *path)
 {
 	int ret;
 	struct btrfs_key key;
@@ -1562,7 +1564,7 @@ static int count_inode_refs(struct btrfs_inode *inode, struct btrfs_path *path)
 	key.offset = (u64)-1;
 
 	while (1) {
-		ret = btrfs_search_slot(NULL, inode->root, &key, path, 0, 0);
+		ret = btrfs_search_slot(NULL, root, &key, path, 0, 0);
 		if (ret < 0)
 			break;
 		if (ret > 0) {
@@ -1614,9 +1616,9 @@ process_slot:
  * will free the inode.
  */
 static noinline int fixup_inode_link_count(struct btrfs_trans_handle *trans,
+					   struct btrfs_root *root,
 					   struct inode *inode)
 {
-	struct btrfs_root *root = BTRFS_I(inode)->root;
 	struct btrfs_path *path;
 	int ret;
 	u64 nlink = 0;
@@ -1626,13 +1628,13 @@ static noinline int fixup_inode_link_count(struct btrfs_trans_handle *trans,
 	if (!path)
 		return -ENOMEM;
 
-	ret = count_inode_refs(BTRFS_I(inode), path);
+	ret = count_inode_refs(root, BTRFS_I(inode), path);
 	if (ret < 0)
 		goto out;
 
 	nlink = ret;
 
-	ret = count_inode_extrefs(BTRFS_I(inode), path);
+	ret = count_inode_extrefs(root, BTRFS_I(inode), path);
 	if (ret < 0)
 		goto out;
 
@@ -1704,7 +1706,7 @@ static noinline int fixup_inode_link_counts(struct btrfs_trans_handle *trans,
 			break;
 		}
 
-		ret = fixup_inode_link_count(trans, inode);
+		ret = fixup_inode_link_count(trans, root, inode);
 		iput(inode);
 		if (ret)
 			break;
