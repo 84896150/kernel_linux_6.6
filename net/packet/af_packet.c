@@ -2852,21 +2852,15 @@ static int tpacket_snd(struct packet_sock *po, struct msghdr *msg)
 		ph = packet_current_frame(po, &po->tx_ring,
 					  TP_STATUS_SEND_REQUEST);
 		if (unlikely(ph == NULL)) {
-			/* Note: packet_read_pending() might be slow if we
-			 * have to call it as it's per_cpu variable, but in
-			 * fast-path we don't have to call it, only when ph
-			 * is NULL, we need to check the pending_refcnt.
-			 */
-			if (need_wait && packet_read_pending(&po->tx_ring)) {
+			if (need_wait && skb) {
 				timeo = wait_for_completion_interruptible_timeout(&po->skb_completion, timeo);
 				if (timeo <= 0) {
 					err = !timeo ? -ETIMEDOUT : -ERESTARTSYS;
 					goto out_put;
 				}
-				/* check for additional frames */
-				continue;
-			} else
-				break;
+			}
+			/* check for additional frames */
+			continue;
 		}
 
 		skb = NULL;
@@ -2955,7 +2949,14 @@ tpacket_error:
 		}
 		packet_increment_head(&po->tx_ring);
 		len_sum += tp_len;
-	} while (1);
+	} while (likely((ph != NULL) ||
+		/* Note: packet_read_pending() might be slow if we have
+		 * to call it as it's per_cpu variable, but in fast-path
+		 * we already short-circuit the loop with the first
+		 * condition, and luckily don't have to go that path
+		 * anyway.
+		 */
+		 (need_wait && packet_read_pending(&po->tx_ring))));
 
 	err = len_sum;
 	goto out_put;
