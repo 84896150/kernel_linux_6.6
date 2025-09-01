@@ -2374,19 +2374,18 @@ int ext4_ext_calc_credits_for_single_extent(struct inode *inode, int nrblocks,
 int ext4_ext_index_trans_blocks(struct inode *inode, int extents)
 {
 	int index;
+	int depth;
 
 	/* If we are converting the inline data, only one is needed here. */
 	if (ext4_has_inline_data(inode))
 		return 1;
 
-	/*
-	 * Extent tree can change between the time we estimate credits and
-	 * the time we actually modify the tree. Assume the worst case.
-	 */
+	depth = ext_depth(inode);
+
 	if (extents <= 1)
-		index = EXT4_MAX_EXTENT_DEPTH * 2;
+		index = depth * 2;
 	else
-		index = EXT4_MAX_EXTENT_DEPTH * 3;
+		index = depth * 3;
 
 	return index;
 }
