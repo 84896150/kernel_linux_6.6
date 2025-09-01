@@ -10,7 +10,6 @@
 #include <assert.h>
 #include <unistd.h>
 #include <stdarg.h>
-#include <linux/kallsyms.h>
 
 #define unlikely(cond) (cond)
 
@@ -107,7 +106,7 @@ static void parse_args(int argc, char **argv)
 	}
 }
 
-#define BUFSIZE (256 + KSYM_NAME_LEN)
+#define BUFSIZE 256
 
 int main(int argc, char **argv)
 {
