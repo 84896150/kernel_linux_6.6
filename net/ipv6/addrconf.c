@@ -7383,8 +7383,7 @@ int __init addrconf_init(void)
 	if (err < 0)
 		goto out_addrlabel;
 
-	/* All works using addrconf_wq need to lock rtnl. */
-	addrconf_wq = create_singlethread_workqueue("ipv6_addrconf");
+	addrconf_wq = create_workqueue("ipv6_addrconf");
 	if (!addrconf_wq) {
 		err = -ENOMEM;
 		goto out_nowq;
