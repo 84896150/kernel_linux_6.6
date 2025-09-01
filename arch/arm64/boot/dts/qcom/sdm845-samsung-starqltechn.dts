@@ -418,8 +418,7 @@
 };
 
 &tlmm {
-	gpio-reserved-ranges = <27 4>, /* SPI (eSE - embedded Secure Element) */
-			       <85 4>; /* SPI (fingerprint reader) */
+	gpio-reserved-ranges = <0 4>, <27 4>, <81 4>, <85 4>;
 
 	sdc2_clk_state: sdc2-clk-state {
 		pins = "sdc2_clk";
