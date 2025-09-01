@@ -558,7 +558,8 @@ cifs_ses_add_channel(struct cifs_ses *ses,
 	ctx->domainauto = ses->domainAuto;
 	ctx->domainname = ses->domainName;
 
-	ctx->server_hostname = ses->server->hostname;
+	/* no hostname for extra channels */
+	ctx->server_hostname = "";
 
 	ctx->username = ses->user_name;
 	ctx->password = ses->password;
