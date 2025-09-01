@@ -1120,13 +1120,9 @@ alloc_encrypted:
 					num_async++;
 				else if (ret == -ENOMEM)
 					goto wait_for_memory;
-				else if (ctx->open_rec && ret == -ENOSPC) {
-					if (msg_pl->cork_bytes) {
-						ret = 0;
-						goto send_end;
-					}
+				else if (ctx->open_rec && ret == -ENOSPC)
 					goto rollback_iter;
-				} else if (ret != -EAGAIN)
+				else if (ret != -EAGAIN)
 					goto send_end;
 			}
 			continue;
