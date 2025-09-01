@@ -442,18 +442,23 @@ static void mdacon_putcs(struct vc_data *c, const unsigned short *s,
 	}
 }
 
-static void mdacon_clear(struct vc_data *c, unsigned int y, unsigned int x,
-			 unsigned int width)
+static void mdacon_clear(struct vc_data *c, int y, int x, 
+			  int height, int width)
 {
 	u16 *dest = mda_addr(x, y);
 	u16 eattr = mda_convert_attr(c->vc_video_erase_char);
 
-	if (width <= 0)
+	if (width <= 0 || height <= 0)
 		return;
 
-	scr_memsetw(dest, eattr, width * 2);
+	if (x==0 && width==mda_num_columns) {
+		scr_memsetw(dest, eattr, height*width*2);
+	} else {
+		for (; height > 0; height--, dest+=mda_num_columns)
+			scr_memsetw(dest, eattr, width*2);
+	}
 }
-
+                        
 static int mdacon_switch(struct vc_data *c)
 {
 	return 1;	/* redrawing needed */
