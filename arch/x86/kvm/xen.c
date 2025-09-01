@@ -1260,7 +1260,7 @@ static bool kvm_xen_schedop_poll(struct kvm_vcpu *vcpu, bool longmode,
 	if (kvm_read_guest_virt(vcpu, (gva_t)sched_poll.ports, ports,
 				sched_poll.nr_ports * sizeof(*ports), &e)) {
 		*r = -EFAULT;
-		goto out;
+		return true;
 	}
 
 	for (i = 0; i < sched_poll.nr_ports; i++) {
