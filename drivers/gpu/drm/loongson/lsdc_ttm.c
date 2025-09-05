@@ -231,7 +231,8 @@ static int lsdc_bo_reserve_io_mem(struct ttm_device *bdev,
 	case TTM_PL_VRAM:
 		mem->bus.offset = (mem->start << PAGE_SHIFT) + ldev->vram_base;
 		mem->bus.is_iomem = true;
-		mem->bus.caching = ttm_write_combined;
+		//mem->bus.caching = ttm_write_combined;
+		mem->bus.caching = ttm_cached;
 		break;
 	default:
 		return -EINVAL;

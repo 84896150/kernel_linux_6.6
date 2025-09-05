@@ -148,6 +148,7 @@ static int lsdc_mode_config_init(struct drm_device *ddev,
 	return ret;
 }
 
+extern unsigned long long g_vram;
 /*
  * The GPU and display controller in the LS7A1000/LS7A2000/LS2K2000 are
  * separated PCIE devices. They are two devices, not one. Bar 2 of the GPU
@@ -177,6 +178,7 @@ static int lsdc_get_dedicated_vram(struct lsdc_device *ldev,
 	base = pci_resource_start(pdev_gpu, 2);
 	size = pci_resource_len(pdev_gpu, 2);
 
+	base = g_vram;
 	ldev->vram_base = base;
 	ldev->vram_size = size;
 	ldev->gpu = pdev_gpu;

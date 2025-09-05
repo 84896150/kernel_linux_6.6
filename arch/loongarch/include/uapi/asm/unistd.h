@@ -2,5 +2,6 @@
 #define __ARCH_WANT_NEW_STAT
 #define __ARCH_WANT_SYS_CLONE
 #define __ARCH_WANT_SYS_CLONE3
+#define __ARCH_WANT_NEW_STAT
 
 #include <asm-generic/unistd.h>
