@@ -701,7 +701,6 @@ static void __io_cqring_overflow_flush(struct io_ring_ctx *ctx)
 		 * to care for a non-real case.
 		 */
 		if (need_resched()) {
-			ctx->cqe_sentinel = ctx->cqe_cached;
 			io_cq_unlock_post(ctx);
 			mutex_unlock(&ctx->uring_lock);
 			cond_resched();
@@ -919,6 +918,14 @@ static bool __io_post_aux_cqe(struct io_ring_ctx *ctx, u64 user_data, s32 res, u
 			      bool allow_overflow)
 {
 	bool filled;
+
+	/*
+	 * If multishot has already posted deferred completions, ensure that
+	 * those are flushed first before posting this one. If not, CQEs
+	 * could get reordered.
+	 */
+	if (!wq_list_empty(&ctx->submit_state.compl_reqs))
+		__io_submit_flush_completions(ctx);
 
 	io_cq_lock(ctx);
 	filled = io_fill_cqe_aux(ctx, user_data, res, cflags);
@@ -1808,7 +1815,7 @@ queue:
 	spin_unlock(&ctx->completion_lock);
 
 	io_prep_async_link(req);
-	de = kmalloc(sizeof(*de), GFP_KERNEL_ACCOUNT);
+	de = kmalloc(sizeof(*de), GFP_KERNEL);
 	if (!de) {
 		ret = -ENOMEM;
 		io_req_defer_failed(req, ret);
@@ -1945,7 +1952,7 @@ fail:
 	if (req->flags & REQ_F_FORCE_ASYNC) {
 		bool opcode_poll = def->pollin || def->pollout;
 
-		if (opcode_poll && io_file_can_poll(req)) {
+		if (opcode_poll && file_can_poll(req->file)) {
 			needs_poll = true;
 			issue_flags |= IO_URING_F_NONBLOCK;
 		}
