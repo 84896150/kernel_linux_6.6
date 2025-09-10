@@ -516,6 +516,12 @@ config HYPERHOLD_ZSWAPD
 	  and the refault of anonymous pages is high, the content of
 	  zram will exchanged to eswap by a certain percentage.
 
+config PAGE_TRACING
+	bool "Enable Page Tracing"
+	default n
+	help
+	  This option enables page tracing.
+
 config RECLAIM_ACCT
 	bool "Memory reclaim delay accounting"
 	default n
@@ -1263,6 +1269,16 @@ config ANON_VMA_NAME
 	  Assigning a name to anonymous virtual memory area might prevent that
 	  area from being merged with adjacent virtual memory areas due to the
 	  difference in their name.
+
+#
+# Show the process ashmem for debug
+#
+config MEMTRACE_ASHMEM
+	bool "Ashmem Process Info Show"
+	depends on ASHMEM
+	default n
+	help
+	  Enable the Ashmem Process Info Show
 
 config USERFAULTFD
 	bool "Enable userfaultfd() system call"
